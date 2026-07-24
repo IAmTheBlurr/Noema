@@ -1,0 +1,131 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function hasOnlyEntryFields(data) {
+      return data.keys().hasOnly([
+        'ownerId',
+        'rawText',
+        'url',
+        'money',
+        'notes',
+        'timeHorizon',
+        'status',
+        'recurrenceCount',
+        'createdAt',
+        'updatedAt',
+        'archivedAt',
+        'trashedAt',
+        'schemaVersion'
+      ]);
+    }
+
+    function validOptionalString(value, maxLength) {
+      return value == null || (value is string && value.size() <= maxLength);
+    }
+
+    function validMoney(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasOnly(['amount', 'currency']) &&
+        value.amount is number &&
+        value.amount >= 0 &&
+        value.amount <= 1000000000000 &&
+        value.currency is string &&
+        value.currency.matches('^[A-Z]{3}$')
+      );
+    }
+
+    function validStatus(value) {
+      return value == 'active' || value == 'archived' || value == 'trashed';
+    }
+
+    function validEntry(data, uid) {
+      return hasOnlyEntryFields(data) &&
+        data.ownerId == uid &&
+        data.rawText is string &&
+        data.rawText.size() > 0 &&
+        data.rawText.size() <= 10000 &&
+        validOptionalString(data.url, 2048) &&
+        validMoney(data.money) &&
+        validOptionalString(data.notes, 20000) &&
+        validOptionalString(data.timeHorizon, 500) &&
+        validStatus(data.status) &&
+        data.recurrenceCount is int &&
+        data.recurrenceCount >= 0 &&
+        data.recurrenceCount <= 1000000 &&
+        data.schemaVersion == 1 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (data.archivedAt == null || data.archivedAt is timestamp) &&
+        (data.trashedAt == null || data.trashedAt is timestamp);
+    }
+
+    function hasOnlyEventFields(data) {
+      return data.keys().hasOnly([
+        'ownerId',
+        'entryId',
+        'type',
+        'occurredAt',
+        'schemaVersion',
+        'changedFields'
+      ]);
+    }
+
+    function validEventType(value) {
+      return value == 'created' ||
+        value == 'edited' ||
+        value == 'resurfaced' ||
+        value == 'archived' ||
+        value == 'restored' ||
+        value == 'trashed' ||
+        value == 'restored_from_trash';
+    }
+
+    function validEvent(data, uid, entryId) {
+      return hasOnlyEventFields(data) &&
+        data.ownerId == uid &&
+        data.entryId == entryId &&
+        validEventType(data.type) &&
+        data.occurredAt is timestamp &&
+        data.schemaVersion == 1 &&
+        (!data.keys().hasAny(['changedFields']) ||
+          (data.changedFields is list && data.changedFields.size() <= 20));
+    }
+
+    match /users/{uid} {
+      allow read, write: if signedInAs(uid);
+
+      match /entries/{entryId} {
+        allow read: if signedInAs(uid);
+        allow create: if signedInAs(uid) && validEntry(request.resource.data, uid);
+        allow update: if signedInAs(uid) &&
+          resource.data.ownerId == uid &&
+          request.resource.data.ownerId == resource.data.ownerId &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          validEntry(request.resource.data, uid);
+        allow delete: if false;
+
+        match /events/{eventId} {
+          allow read: if signedInAs(uid);
+          allow create: if signedInAs(uid) &&
+            exists(/databases/$(database)/documents/users/$(uid)/entries/$(entryId)) &&
+            validEvent(request.resource.data, uid, entryId);
+          allow update, delete: if false;
+        }
+
+        match /interpretations/{interpretationId} {
+          allow read, write: if false;
+        }
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
