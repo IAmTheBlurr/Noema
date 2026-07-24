@@ -9,6 +9,8 @@ node_modules
 /build
 /functions/lib
 /.firebase
+/.firebase-config
+/.tools
 /firebase-debug.log
 /firestore-debug.log
 /ui-debug.log

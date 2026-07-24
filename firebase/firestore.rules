@@ -72,8 +72,23 @@ service cloud.firestore {
         'type',
         'occurredAt',
         'schemaVersion',
-        'changedFields'
+        'changedFields',
+        'revision'
       ]);
+    }
+
+    function validRevision(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasOnly(['rawText', 'url', 'money', 'notes', 'timeHorizon']) &&
+        value.rawText is string &&
+        value.rawText.size() > 0 &&
+        value.rawText.size() <= 10000 &&
+        validOptionalString(value.url, 2048) &&
+        validMoney(value.money) &&
+        validOptionalString(value.notes, 20000) &&
+        validOptionalString(value.timeHorizon, 500)
+      );
     }
 
     function validEventType(value) {
@@ -93,12 +108,13 @@ service cloud.firestore {
         validEventType(data.type) &&
         data.occurredAt is timestamp &&
         data.schemaVersion == 1 &&
+        (!data.keys().hasAny(['revision']) || validRevision(data.revision)) &&
         (!data.keys().hasAny(['changedFields']) ||
           (data.changedFields is list && data.changedFields.size() <= 20));
     }
 
     match /users/{uid} {
-      allow read, write: if signedInAs(uid);
+      allow read, write: if false;
 
       match /entries/{entryId} {
         allow read: if signedInAs(uid);
@@ -113,7 +129,7 @@ service cloud.firestore {
         match /events/{eventId} {
           allow read: if signedInAs(uid);
           allow create: if signedInAs(uid) &&
-            exists(/databases/$(database)/documents/users/$(uid)/entries/$(entryId)) &&
+            existsAfter(/databases/$(database)/documents/users/$(uid)/entries/$(entryId)) &&
             validEvent(request.resource.data, uid, entryId);
           allow update, delete: if false;
         }

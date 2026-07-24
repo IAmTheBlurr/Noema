@@ -4,6 +4,14 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
+	build: {
+		chunkSizeWarningLimit: 700,
+		rolldownOptions: {
+			checks: {
+				pluginTimings: false
+			}
+		}
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({

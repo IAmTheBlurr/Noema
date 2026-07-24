@@ -5,13 +5,13 @@
 	"type": "module",
 	"packageManager": "pnpm@11.9.0",
 	"engines": {
-		"node": ">=24 <25",
+		"node": ">=22 <23",
 		"pnpm": ">=11 <12"
 	},
 	"scripts": {
 		"dev": "concurrently --kill-others-on-fail --names emulators,web --prefix-colors magenta,cyan \"pnpm dev:emulators\" \"pnpm dev:web\"",
 		"dev:web": "vite dev --host 127.0.0.1",
-		"dev:emulators": "pnpm functions:build && firebase emulators:start --project demo-life-corpus",
+		"dev:emulators": "pnpm functions:build && cross-env XDG_CONFIG_HOME=.firebase-config FIREBASE_CLI_DISABLE_TELEMETRY=1 firebase emulators:start --only auth,firestore,functions,hosting --project demo-life-corpus",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync",
@@ -21,10 +21,11 @@
 		"format": "prettier --write .",
 		"test:unit": "vitest run",
 		"test": "pnpm test:unit",
-		"test:e2e": "playwright test",
-		"test:rules": "firebase emulators:exec --only firestore --project demo-life-corpus \"pnpm vitest run tests/rules\"",
+		"test:e2e": "pnpm functions:build && cross-env XDG_CONFIG_HOME=.firebase-config FIREBASE_CLI_DISABLE_TELEMETRY=1 firebase emulators:exec --only auth,firestore,functions --project demo-life-corpus \"pnpm test:e2e:browser\"",
+		"test:e2e:browser": "playwright test",
+		"test:rules": "cross-env XDG_CONFIG_HOME=.firebase-config FIREBASE_CLI_DISABLE_TELEMETRY=1 firebase emulators:exec --only firestore --project demo-life-corpus \"pnpm vitest run --config vitest.rules.config.ts\"",
 		"functions:build": "pnpm --dir functions build",
-		"verify": "pnpm check && pnpm lint && pnpm test:unit && pnpm test:rules && pnpm functions:build && pnpm build"
+		"verify": "pnpm check && pnpm lint && pnpm test:unit && pnpm test:rules && pnpm test:e2e && pnpm functions:build && pnpm build"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
