@@ -10,7 +10,7 @@ Fields: `ownerId`, `rawText`, nullable `url`, nullable `money { amount, currency
 
 Path: `users/{uid}/entries/{entryId}/events/{eventId}`
 
-Events are append-only and contain `ownerId`, `entryId`, `type`, authoritative `occurredAt`, `schemaVersion: 1`, and optional non-sensitive `changedFields`. Implemented types are created, edited, resurfaced, archived, restored, trashed, and restored from trash.
+Events are append-only and contain `ownerId`, `entryId`, `type`, authoritative `occurredAt`, `schemaVersion: 1`, and optional `changedFields`. Created and edited events also preserve a revision snapshot of the human-authored fields so the original wording remains inspectable. Implemented types are created, edited, resurfaced, archived, restored, trashed, and restored from trash.
 
 ## Interpretation seam
 

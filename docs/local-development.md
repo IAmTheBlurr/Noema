@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 24.11.1
+- Node.js 22.23.1
 - pnpm 11.9.0
 - Java 21 or newer for Firebase emulators
 
