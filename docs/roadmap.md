@@ -1,18 +1,25 @@
-# Roadmap horizons
+# Roadmap
 
-These are preserved areas, not a committed implementation order:
+Implemented:
 
-- Structured desires and needs
-- Maintenance planning
-- Financial records and recovery
-- Debt and tax evidence
-- Contacts and organizations
-- Documents and provenance
-- Goals and dependencies
-- Relationships among records
-- AI interpretations and user-approved decisions
-- Bounded domain perspectives
-- Conversational querying across life domains
-- Data export and portability
+- shared entry substrate with optional capability blocks
+- life events and temporal uncertainty
+- standing records and historical state
+- recurring commitments and yearly cadence
+- financial baseline and subscription projections
+- verification discovery
+- portable full-corpus export
 
-Voice capture, reminders, external account actions, recommendation engines, and autonomous behavior remain explicitly out of Phase 1.
+Deferred:
+
+- automatic Gemini classification and date inference
+- bank, Plaid, credit, tax, and document imports
+- reminders and notifications
+- graphical timelines
+- category management and user-defined schemas
+- knowledge graphs and vector search
+- currency conversion
+- budgeting, debt strategy, recommendations, and autonomous financial actions
+- live balances and external account changes
+
+Future AI work must write reviewable interpretations with provenance and must never silently create canonical facts.

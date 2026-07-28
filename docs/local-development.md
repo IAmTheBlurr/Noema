@@ -4,7 +4,8 @@
 
 - Node.js 22.23.1
 - pnpm 11.9.0
-- Java 21 or newer for Firebase emulators
+- Java 21 or newer
+- Chromium installed through Playwright
 
 ## Start
 
@@ -14,11 +15,9 @@ pnpm exec playwright install chromium
 pnpm dev
 ```
 
-`pnpm dev` builds Functions, then starts Auth, Firestore, Functions, Hosting emulators and the Svelte development server. Open `http://127.0.0.1:5173`. Choose **Enter local vault**. The clearly marked local path creates an anonymous emulator-only identity and never contacts production.
+Open `http://127.0.0.1:5173`. The local sign-in creates an anonymous emulator identity. Auth, Firestore, Functions, and Hosting connect only to localhost under `demo-life-corpus`. The Emulator Suite UI is at `http://127.0.0.1:4000`.
 
-The Emulator Suite UI is at `http://127.0.0.1:4000`.
-
-No `.env` file or production credential is required. Copy `.env.example` only to override safe defaults. Never put a Gemini key in a browser environment variable.
+No production credential is required. Copy `.env.example` only to override safe defaults. Never put a Gemini key in a browser environment variable.
 
 ## Verify
 
@@ -28,6 +27,9 @@ pnpm lint
 pnpm test
 pnpm test:rules
 pnpm test:e2e
+pnpm functions:build
 pnpm build
 pnpm verify
 ```
+
+Rules and browser tests start Firebase emulators and therefore fail immediately when Java is unavailable. The repository declares Node 22; other Node majors emit an engine warning and are not the deployment target.
