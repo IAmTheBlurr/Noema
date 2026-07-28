@@ -3,6 +3,14 @@
 		"rules": "firebase/firestore.rules",
 		"indexes": "firebase/firestore.indexes.json"
 	},
+	"auth": {
+		"providers": {
+			"googleSignIn": {
+				"oAuthBrandDisplayName": "Noema",
+				"supportEmail": "iamtheblurr@gmail.com"
+			}
+		}
+	},
 	"functions": [
 		{
 			"source": "functions",

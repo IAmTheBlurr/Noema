@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { env } from '$env/dynamic/public';
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import {
@@ -19,8 +20,8 @@ export interface FirebaseServices {
 
 let services: FirebaseServices | undefined;
 
-function publicValue(name: string, fallback: string): string {
-	const value = import.meta.env[name];
+function publicValue(name: `PUBLIC_${string}`, fallback: string): string {
+	const value = env[name];
 	return typeof value === 'string' && value.trim().length > 0 ? value : fallback;
 }
 
@@ -38,7 +39,13 @@ export function firebaseServices(): FirebaseServices {
 		apiKey: publicValue('PUBLIC_FIREBASE_API_KEY', 'demo-api-key'),
 		appId: publicValue('PUBLIC_FIREBASE_APP_ID', '1:1234567890:web:demo'),
 		authDomain: publicValue('PUBLIC_FIREBASE_AUTH_DOMAIN', 'demo-life-corpus.firebaseapp.com'),
-		projectId
+		projectId,
+		storageBucket: publicValue(
+			'PUBLIC_FIREBASE_STORAGE_BUCKET',
+			'demo-life-corpus.firebasestorage.app'
+		),
+		messagingSenderId: publicValue('PUBLIC_FIREBASE_MESSAGING_SENDER_ID', '1234567890'),
+		measurementId: publicValue('PUBLIC_FIREBASE_MEASUREMENT_ID', 'G-DEMO')
 	});
 	const auth = getAuth(app);
 	let db: Firestore;

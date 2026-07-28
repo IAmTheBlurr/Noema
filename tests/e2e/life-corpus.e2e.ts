@@ -1,53 +1,57 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 test('captures, retrieves, revises, resurfaces, archives, restores, and deletes an entry', async ({
 	page
 }) => {
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Enter local vault' }).click();
 	await expect(
-		page.getByRole('heading', { name: 'What is asking to be remembered?' })
+		page.locator('.noema-card.card').getByRole('heading', { name: 'Noema' })
 	).toBeVisible();
-	await page.getByRole('button', { name: 'Run health check' }).click();
-	await expect(page.getByText('Ready · mock')).toBeVisible();
+	await expect(page.locator('section.signin-card')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Enter' }).click();
+	await expect(page.getByRole('heading', { name: 'Thought' })).toBeVisible();
+	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
+	await expect(page.getByText('Empty', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'Check' }).click();
+	await expect(page.getByText('OK · mock')).toBeVisible();
 
 	const thought = 'Replace the Dakota oxygen sensors before the autumn photography trip';
-	await page.getByLabel('Capture a thought').fill(thought);
-	await page.getByRole('button', { name: 'Optional details' }).click();
+	await page.getByLabel('Entry', { exact: true }).fill(thought);
+	await page.getByRole('button', { name: 'Details' }).click();
 	await page.getByLabel('URL', { exact: true }).fill('https://example.com/sensors');
-	await page.getByLabel('Approximate amount').fill('240');
-	await page.getByLabel('Date or time horizon').fill('This autumn');
-	await page.getByLabel('Notes or justification').fill('Avoid losing continuity before travel.');
-	await page.getByRole('button', { name: 'Keep thought' }).click();
+	await page.getByLabel('Amount').fill('240');
+	await page.getByLabel('Date').fill('This autumn');
+	await page.getByLabel('Notes').fill('Avoid losing continuity before travel.');
+	await page.getByRole('button', { name: 'Add' }).click();
 
 	const entryCard = page.locator('.entry-card').filter({ hasText: thought });
 	await expect(entryCard).toBeVisible();
 	await expect(entryCard).toContainText('$240.00');
-	await expect(page.getByRole('status')).toContainText('Thought kept safely');
 
-	await page.getByPlaceholder('Search your entries').fill('Dakota autumn');
+	await page.getByLabel('Search').fill('Dakota autumn');
 	await expect(entryCard).toBeVisible();
-	await page.getByPlaceholder('Search your entries').fill('earbuds');
-	await expect(page.getByText('Nothing matches that search')).toBeVisible();
-	await page.getByRole('button', { name: 'Clear search' }).click();
+	await page.getByLabel('Search').fill('earbuds');
+	await expect(entryCard).not.toBeVisible();
+	await expect(page.getByText('Empty', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'Clear' }).click();
 
-	await entryCard.getByRole('button', { name: /Remembered again/ }).click();
-	await expect(entryCard.getByRole('button', { name: /Current recurrence count 1/ })).toBeVisible();
+	await entryCard.getByRole('button', { name: 'Repeat' }).click();
 
 	await entryCard.locator('.card-main').click();
-	await expect(page.getByRole('dialog')).toBeVisible();
-	await expect(page.getByText('1 resurfacing', { exact: true })).toBeVisible();
-	await expect(
-		page.getByRole('region', { name: 'History' }).getByText('Remembered again', { exact: true })
-	).toBeVisible();
+	const editor = page.getByRole('dialog', { name: 'Edit' });
+	await expect(editor).toBeVisible();
+	await expect(editor.getByText('Repeated', { exact: true })).toBeVisible();
 
-	await page.getByLabel('Original thought').fill(`${thought} — check part numbers`);
-	await page.getByRole('button', { name: 'Save changes' }).click();
-	await expect(page.getByText('Changes saved with history.')).toBeVisible();
+	await editor.getByLabel('Entry').fill(`${thought} — check part numbers`);
+	await editor.getByRole('button', { name: 'Save' }).click();
 
 	const editedCard = page.locator('.entry-card').filter({ hasText: 'check part numbers' });
 	await editedCard.locator('.card-main').click();
-	await page.getByRole('button', { name: 'Archive', exact: true }).click();
+	await page
+		.getByRole('dialog', { name: 'Edit' })
+		.getByRole('button', { name: 'Archive', exact: true })
+		.click();
 	await page
 		.locator('aside nav')
 		.getByRole('button', { name: /Archive/ })
@@ -56,18 +60,188 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 
 	const archivedCard = page.locator('.entry-card').filter({ hasText: 'check part numbers' });
 	await archivedCard.locator('.card-main').click();
-	await page.getByRole('button', { name: 'Restore to inbox' }).click();
+	await page.getByRole('dialog', { name: 'Edit' }).getByRole('button', { name: 'Restore' }).click();
 	await page.locator('aside nav').getByRole('button', { name: /Inbox/ }).click();
 
 	const restoredCard = page.locator('.entry-card').filter({ hasText: 'check part numbers' });
 	await restoredCard.locator('.card-main').click();
-	await page.getByRole('button', { name: 'Move to trash' }).click();
+	await page.getByRole('dialog', { name: 'Edit' }).getByRole('button', { name: 'Delete' }).click();
 	await page.locator('aside nav').getByRole('button', { name: /Trash/ }).click();
 
 	const trashedCard = page.locator('.entry-card').filter({ hasText: 'check part numbers' });
 	await trashedCard.locator('.card-main').click();
-	await page.getByRole('button', { name: 'Permanently delete' }).click();
-	await page.getByRole('button', { name: 'Yes, permanently delete' }).click();
-	await expect(page.getByText('Entry and its history were permanently deleted.')).toBeVisible();
+	const trashEditor = page.getByRole('dialog', { name: 'Edit' });
+	await trashEditor.getByRole('button', { name: 'Delete' }).click();
+	await trashEditor.getByRole('button', { name: 'Delete' }).click();
 	await expect(trashedCard).not.toBeVisible();
+});
+
+test('captures placed and unplaced life events', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Enter' }).click();
+	await page.getByRole('radio', { name: 'Life event' }).click();
+	await expect(page.getByRole('heading', { name: 'Event' })).toBeVisible();
+
+	await page.getByLabel('Entry', { exact: true }).fill('Moved out of the camper');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'Moved out of the camper' })
+	).toBeVisible();
+
+	await page.getByRole('radio', { name: 'Life event' }).click();
+	await page.getByLabel('Entry', { exact: true }).fill('Started the Rapid City lease');
+	await page.getByRole('button', { name: 'Details' }).click();
+	await page.getByLabel('When').fill('Sometime during winter 2023');
+	await page.getByLabel('Earliest').fill('2023-12-01');
+	await page.getByLabel('Latest').fill('2024-02-29');
+	await page.getByLabel('Precision').selectOption('season');
+	await page.getByLabel('Reviewed').check();
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'Started the Rapid City lease' })
+	).toBeVisible();
+
+	await page.locator('aside nav').getByRole('button', { name: 'Life events' }).click();
+	await expect(page.getByRole('heading', { name: 'Events' })).toBeVisible();
+	await expect(page.getByText('Unplaced', { exact: true })).toBeVisible();
+	await expect(page.getByText('Moved out of the camper', { exact: true })).toBeVisible();
+	await expect(page.getByText('Sometime during winter 2023', { exact: true })).toBeVisible();
+	await expect(page.getByText('season', { exact: true })).toBeVisible();
+});
+
+test('derives financial, subscription, and verification views from shared entries', async ({
+	page
+}) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Enter' }).click();
+
+	await page.getByRole('radio', { name: 'Standing record' }).click();
+	await page.getByLabel('Entry', { exact: true }).fill('Current annual salary');
+	await page.getByRole('button', { name: 'Details' }).click();
+	await page.getByLabel('Amount').fill('120000');
+	const salaryGroup = page.getByRole('group', { name: 'Standing' });
+	await salaryGroup.getByLabel('Subject').selectOption('salary');
+	await salaryGroup.getByLabel('Verification').selectOption('confirmed');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'Current annual salary' })
+	).toBeVisible();
+
+	await page.getByLabel('Entry', { exact: true }).fill('Current pay frequency');
+	await page.getByRole('button', { name: 'Details' }).click();
+	const payGroup = page.getByRole('group', { name: 'Standing' });
+	await payGroup.getByLabel('Subject').selectOption('pay-frequency');
+	await payGroup.getByLabel('Value').fill('Biweekly');
+	await payGroup.getByLabel('Verification').selectOption('confirmed');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'Current pay frequency' })
+	).toBeVisible();
+
+	await page.getByLabel('Entry', { exact: true }).fill('Current rent');
+	await page.getByRole('button', { name: 'Details' }).click();
+	await page.getByLabel('Amount').fill('1500');
+	const rentStanding = page.getByRole('group', { name: 'Standing' });
+	await rentStanding.getByLabel('Subject').selectOption('rent');
+	await rentStanding.getByLabel('Verification').selectOption('confirmed');
+	await page.getByLabel('Recurring', { exact: true }).check();
+	const rentRecurring = page.getByRole('group', { name: 'Recurring' });
+	await rentRecurring.getByLabel('Kind').selectOption('rent');
+	await rentRecurring.getByLabel('Cadence').selectOption('monthly');
+	await rentRecurring.getByLabel('Verification').selectOption('confirmed');
+	await rentRecurring.getByLabel('Active state').selectOption('active');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.locator('.entry-card').filter({ hasText: 'Current rent' })).toBeVisible();
+
+	await page.getByRole('radio', { name: 'Recurring' }).click();
+	await page.getByLabel('Entry', { exact: true }).fill('I may still be paying for Adobe');
+	await page.getByRole('button', { name: 'Details' }).click();
+	const suspected = page.getByRole('group', { name: 'Recurring' });
+	await suspected.getByLabel('Kind').selectOption('subscription');
+	await suspected.getByLabel('Verification').selectOption('suspected');
+	await suspected.getByLabel('Active state').selectOption('possibly-active');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
+	).toBeVisible();
+
+	await page.getByLabel('Entry', { exact: true }).fill('Cloud storage');
+	await page.getByRole('button', { name: 'Details' }).click();
+	await page.getByLabel('Amount').fill('20');
+	const confirmed = page.getByRole('group', { name: 'Recurring' });
+	await confirmed.getByLabel('Kind').selectOption('subscription');
+	await confirmed.getByLabel('Cadence').selectOption('monthly');
+	await confirmed.getByLabel('Verification').selectOption('confirmed');
+	await confirmed.getByLabel('Active state').selectOption('active');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.locator('.entry-card').filter({ hasText: 'Cloud storage' })).toBeVisible();
+
+	const rentCard = page.locator('.entry-card').filter({ hasText: 'Current rent' });
+	await rentCard.locator('.card-main').click();
+	const editor = page.getByRole('dialog', { name: 'Edit' });
+	await expect(editor.getByRole('group', { name: 'Standing' }).getByLabel('Subject')).toHaveValue(
+		'rent'
+	);
+	await expect(editor.getByRole('group', { name: 'Recurring' }).getByLabel('Kind')).toHaveValue(
+		'rent'
+	);
+	await editor.getByLabel('Notes').fill('Lease record');
+	await editor.getByRole('button', { name: 'Save' }).click();
+
+	await page.locator('aside nav').getByRole('button', { name: 'Financial baseline' }).click();
+	await expect(page.getByRole('heading', { name: 'Finances' })).toBeVisible();
+	await expect(page.getByText('$120,000.00', { exact: true })).toBeVisible();
+	await expect(page.getByText('$1,520.00', { exact: true })).toBeVisible();
+	await expect(page.getByText('Biweekly', { exact: true })).toBeVisible();
+
+	await page.locator('aside nav').getByRole('button', { name: 'Subscriptions' }).click();
+	await expect(page.locator('.entry-card').filter({ hasText: 'Cloud storage' })).toBeVisible();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
+	).toBeVisible();
+	await page.getByLabel('Filter').selectOption('missing-amount');
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
+	).toBeVisible();
+	await expect(page.locator('.entry-card').filter({ hasText: 'Cloud storage' })).not.toBeVisible();
+
+	await page.locator('aside nav').getByRole('button', { name: 'Needs verification' }).click();
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
+	).toContainText('Missing amount');
+	await expect(
+		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
+	).toContainText('Missing cadence');
+});
+
+test('downloads a portable corpus ZIP', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Enter' }).click();
+	await page.getByLabel('Entry', { exact: true }).fill('Exported thought');
+	await page.getByRole('button', { name: 'Add' }).click();
+
+	const downloadPromise = page.waitForEvent('download');
+	await page.locator('aside').getByRole('button', { name: 'Export' }).click();
+	const download = await downloadPromise;
+	const path = await download.path();
+	expect(download.suggestedFilename()).toMatch(/^noema-export-\d{4}-\d{2}-\d{2}\.zip$/);
+	expect(path).not.toBeNull();
+	const bytes = await readFile(path!);
+	expect(bytes.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+});
+
+test('keeps capture and navigation usable on a phone viewport', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Enter' }).click();
+
+	await expect(page.getByRole('combobox', { name: 'View' })).toBeVisible();
+	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
+	await page.getByRole('radio', { name: 'Recurring' }).click();
+	await page.getByLabel('Entry', { exact: true }).fill('Phone capture');
+	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.locator('.entry-card').filter({ hasText: 'Phone capture' })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+		true
+	);
 });

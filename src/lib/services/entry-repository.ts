@@ -1,7 +1,9 @@
 import {
 	collection,
+	deleteField,
 	doc,
 	getDoc,
+	getDocs,
 	limit,
 	onSnapshot,
 	orderBy,
@@ -23,94 +25,17 @@ import {
 	type EntryRevision,
 	type EntryStatus
 } from '$lib/domain/entry';
+import { normalizeEntryDocument, normalizeEventDocument } from '$lib/domain/normalize';
 import type { ValidatedEntryInput } from '$lib/validation/entry';
 
 const ENTRY_LIMIT = 500;
 
-function asDate(value: unknown): Date | null {
-	if (typeof value === 'object' && value !== null && 'toDate' in value) {
-		const toDate = Reflect.get(value, 'toDate');
-		if (typeof toDate === 'function') {
-			const result = Reflect.apply(toDate, value, []);
-			return result instanceof Date ? result : null;
-		}
-	}
-	return null;
-}
-
-function asNullableString(value: unknown): string | null {
-	return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-function moneyFromUnknown(value: unknown) {
-	const amount =
-		typeof value === 'object' && value !== null ? Reflect.get(value, 'amount') : undefined;
-	const currency =
-		typeof value === 'object' && value !== null ? Reflect.get(value, 'currency') : undefined;
-	return typeof amount === 'number' && typeof currency === 'string' ? { amount, currency } : null;
-}
-
-function revisionFromUnknown(value: unknown): EntryRevision | null {
-	if (typeof value !== 'object' || value === null) return null;
-	const rawText = Reflect.get(value, 'rawText');
-	if (typeof rawText !== 'string' || rawText.length === 0) return null;
-	return {
-		rawText,
-		url: asNullableString(Reflect.get(value, 'url')),
-		money: moneyFromUnknown(Reflect.get(value, 'money')),
-		notes: asNullableString(Reflect.get(value, 'notes')),
-		timeHorizon: asNullableString(Reflect.get(value, 'timeHorizon'))
-	};
-}
-
 function entryFromSnapshot(snapshot: QueryDocumentSnapshot<DocumentData>): Entry {
-	const data = snapshot.data({ serverTimestamps: 'estimate' });
-	const createdAt = asDate(data.createdAt) ?? new Date();
-
-	return {
-		id: snapshot.id,
-		ownerId: typeof data.ownerId === 'string' ? data.ownerId : '',
-		rawText: typeof data.rawText === 'string' ? data.rawText : '',
-		url: asNullableString(data.url),
-		money: moneyFromUnknown(data.money),
-		notes: asNullableString(data.notes),
-		timeHorizon: asNullableString(data.timeHorizon),
-		status: data.status === 'archived' || data.status === 'trashed' ? data.status : 'active',
-		recurrenceCount: typeof data.recurrenceCount === 'number' ? data.recurrenceCount : 0,
-		createdAt,
-		updatedAt: asDate(data.updatedAt) ?? createdAt,
-		archivedAt: asDate(data.archivedAt),
-		trashedAt: asDate(data.trashedAt),
-		schemaVersion: ENTRY_SCHEMA_VERSION
-	};
-}
-
-function isEntryEventType(value: unknown): value is EntryEventType {
-	return (
-		value === 'created' ||
-		value === 'edited' ||
-		value === 'resurfaced' ||
-		value === 'archived' ||
-		value === 'restored' ||
-		value === 'trashed' ||
-		value === 'restored_from_trash'
-	);
+	return normalizeEntryDocument(snapshot.id, snapshot.data({ serverTimestamps: 'estimate' }));
 }
 
 function eventFromSnapshot(snapshot: QueryDocumentSnapshot<DocumentData>): EntryEvent {
-	const data = snapshot.data({ serverTimestamps: 'estimate' });
-	return {
-		id: snapshot.id,
-		ownerId: typeof data.ownerId === 'string' ? data.ownerId : '',
-		entryId: typeof data.entryId === 'string' ? data.entryId : '',
-		type: isEntryEventType(data.type) ? data.type : 'created',
-		occurredAt: asDate(data.occurredAt) ?? new Date(),
-		schemaVersion: ENTRY_SCHEMA_VERSION,
-		changedFields: Array.isArray(data.changedFields)
-			? data.changedFields.filter((value): value is string => typeof value === 'string')
-			: [],
-		revision: revisionFromUnknown(data.revision)
-	};
+	return normalizeEventDocument(snapshot.id, snapshot.data({ serverTimestamps: 'estimate' }));
 }
 
 function baseEvent(ownerId: string, entryId: string, type: EntryEventType) {
@@ -121,6 +46,88 @@ function baseEvent(ownerId: string, entryId: string, type: EntryEventType) {
 		occurredAt: serverTimestamp(),
 		schemaVersion: ENTRY_SCHEMA_VERSION
 	};
+}
+
+function revisionFromInput(input: ValidatedEntryInput): EntryRevision {
+	return {
+		rawText: input.rawText,
+		url: input.url,
+		money: input.money,
+		notes: input.notes,
+		timeHorizon: input.timeHorizon
+	};
+}
+
+function createFields(input: ValidatedEntryInput) {
+	return {
+		rawText: input.rawText,
+		captureIntent: input.captureIntent,
+		url: input.url,
+		money: input.money,
+		notes: input.notes,
+		timeHorizon: input.timeHorizon,
+		...(input.temporal ? { temporal: input.temporal } : {}),
+		...(input.standingRecord ? { standingRecord: input.standingRecord } : {}),
+		...(input.recurrence ? { recurrence: input.recurrence } : {})
+	};
+}
+
+function updateFields(input: ValidatedEntryInput) {
+	return {
+		rawText: input.rawText,
+		captureIntent: input.captureIntent,
+		url: input.url,
+		money: input.money,
+		notes: input.notes,
+		timeHorizon: input.timeHorizon,
+		temporal: input.temporal ?? deleteField(),
+		standingRecord: input.standingRecord ?? deleteField(),
+		recurrence: input.recurrence ?? deleteField(),
+		schemaVersion: ENTRY_SCHEMA_VERSION,
+		updatedAt: serverTimestamp()
+	};
+}
+
+function differs(left: unknown, right: unknown): boolean {
+	return JSON.stringify(left) !== JSON.stringify(right);
+}
+
+function changedFieldNames(entry: Entry, input: ValidatedEntryInput): string[] {
+	const candidates: ReadonlyArray<readonly [string, boolean]> = [
+		['rawText', entry.rawText !== input.rawText],
+		['captureIntent', entry.captureIntent !== input.captureIntent],
+		['url', entry.url !== input.url],
+		['money', differs(entry.money, input.money)],
+		['notes', entry.notes !== input.notes],
+		['timeHorizon', entry.timeHorizon !== input.timeHorizon],
+		['temporal', differs(entry.temporal, input.temporal)],
+		['standingRecord', differs(entry.standingRecord, input.standingRecord)],
+		['recurrence', differs(entry.recurrence, input.recurrence)]
+	];
+	return candidates.filter(([, changed]) => changed).map(([field]) => field);
+}
+
+function structuredEventTypes(entry: Entry, input: ValidatedEntryInput): EntryEventType[] {
+	const types = new Set<EntryEventType>();
+	if (entry.captureIntent !== input.captureIntent) types.add('capture_intent_changed');
+	if (differs(entry.temporal, input.temporal)) types.add('temporal_details_changed');
+	if (differs(entry.standingRecord, input.standingRecord)) types.add('standing_record_changed');
+	if (differs(entry.recurrence, input.recurrence)) types.add('recurrence_changed');
+
+	if (
+		entry.standingRecord?.verificationStatus !== input.standingRecord?.verificationStatus ||
+		entry.recurrence?.verificationStatus !== input.recurrence?.verificationStatus
+	) {
+		types.add('verification_changed');
+	}
+
+	const wasEnded =
+		entry.standingRecord?.state === 'ended' || entry.recurrence?.activeState === 'ended';
+	const isEnded =
+		input.standingRecord?.state === 'ended' || input.recurrence?.activeState === 'ended';
+	if (!wasEnded && isEnded) types.add('record_ended');
+	if (wasEnded && !isEnded) types.add('record_reactivated');
+	return [...types];
 }
 
 export class FirestoreEntryRepository {
@@ -165,13 +172,40 @@ export class FirestoreEntryRepository {
 		);
 	}
 
+	async loadAll(ownerId: string): Promise<readonly Entry[]> {
+		const snapshot = await getDocs(
+			query(collection(this.db, `users/${ownerId}/entries`), orderBy('createdAt', 'desc'))
+		);
+		return snapshot.docs.map(entryFromSnapshot);
+	}
+
+	async loadAllEvents(ownerId: string, entries: readonly Entry[]): Promise<readonly EntryEvent[]> {
+		const groups = await Promise.all(
+			entries.map(async (entry) => {
+				const snapshot = await getDocs(
+					query(
+						collection(this.db, `users/${ownerId}/entries/${entry.id}/events`),
+						orderBy('occurredAt', 'asc')
+					)
+				);
+				return snapshot.docs.map(eventFromSnapshot);
+			})
+		);
+		return groups.flat().sort((left, right) => {
+			const entryOrder = left.entryId.localeCompare(right.entryId);
+			return entryOrder !== 0
+				? entryOrder
+				: left.occurredAt.valueOf() - right.occurredAt.valueOf() || left.id.localeCompare(right.id);
+		});
+	}
+
 	async create(ownerId: string, input: ValidatedEntryInput): Promise<string> {
 		const entryRef = doc(collection(this.db, `users/${ownerId}/entries`));
 		const eventRef = doc(collection(entryRef, 'events'));
 		const batch = writeBatch(this.db);
 		batch.set(entryRef, {
 			ownerId,
-			...input,
+			...createFields(input),
 			status: 'active',
 			recurrenceCount: 0,
 			createdAt: serverTimestamp(),
@@ -182,32 +216,34 @@ export class FirestoreEntryRepository {
 		});
 		batch.set(eventRef, {
 			...baseEvent(ownerId, entryRef.id, 'created'),
-			revision: input
+			revision: revisionFromInput(input)
 		});
 		await batch.commit();
 		return entryRef.id;
 	}
 
 	async update(ownerId: string, entry: Entry, input: ValidatedEntryInput): Promise<void> {
-		const candidateFields: Array<string | null> = [
-			entry.rawText !== input.rawText ? 'rawText' : null,
-			entry.url !== input.url ? 'url' : null,
-			JSON.stringify(entry.money) !== JSON.stringify(input.money) ? 'money' : null,
-			entry.notes !== input.notes ? 'notes' : null,
-			entry.timeHorizon !== input.timeHorizon ? 'timeHorizon' : null
-		];
-		const changedFields = candidateFields.filter((field): field is string => field !== null);
+		const changedFields = changedFieldNames(entry, input);
 		if (changedFields.length === 0) return;
 
 		const entryRef = doc(this.db, `users/${ownerId}/entries/${entry.id}`);
-		const eventRef = doc(collection(entryRef, 'events'));
 		const batch = writeBatch(this.db);
-		batch.update(entryRef, { ...input, updatedAt: serverTimestamp() });
-		batch.set(eventRef, {
-			...baseEvent(ownerId, entry.id, 'edited'),
-			changedFields,
-			revision: input
-		});
+		batch.update(entryRef, updateFields(input));
+
+		const humanFields = new Set(['rawText', 'url', 'money', 'notes', 'timeHorizon']);
+		if (changedFields.some((field) => humanFields.has(field))) {
+			batch.set(doc(collection(entryRef, 'events')), {
+				...baseEvent(ownerId, entry.id, 'edited'),
+				changedFields: changedFields.filter((field) => humanFields.has(field)),
+				revision: revisionFromInput(input)
+			});
+		}
+		for (const type of structuredEventTypes(entry, input)) {
+			batch.set(doc(collection(entryRef, 'events')), {
+				...baseEvent(ownerId, entry.id, type),
+				changedFields
+			});
+		}
 		await batch.commit();
 	}
 

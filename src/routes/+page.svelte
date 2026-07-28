@@ -1,22 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Archive,
-		BrainCircuit,
-		Inbox,
-		LockKeyhole,
-		LogOut,
-		Search,
-		ShieldCheck,
-		Trash2,
-		X
-	} from '@lucide/svelte';
+	import { LogOut, Search, X } from '@lucide/svelte';
 	import type { User } from 'firebase/auth';
 
 	import CaptureComposer from '$lib/components/CaptureComposer.svelte';
 	import EntryCard from '$lib/components/EntryCard.svelte';
 	import EntryEditor from '$lib/components/EntryEditor.svelte';
+	import FinancialBaselineView from '$lib/components/FinancialBaselineView.svelte';
+	import LifeEventsView from '$lib/components/LifeEventsView.svelte';
 	import type { Entry, EntryEvent, EntryStatus } from '$lib/domain/entry';
+	import {
+		buildFinancialBaseline,
+		projectLifeEvents,
+		projectSubscriptions,
+		projectUnverified,
+		verificationReasonsForCorpus
+	} from '$lib/domain/projections';
 	import {
 		aiDevToolsEnabled,
 		aiProvider,
@@ -26,10 +25,33 @@
 	import { CallableAiClient, type AiHealthResult } from '$lib/services/ai-client';
 	import { observeAuth, signInLocally, signInWithGoogle, signOutUser } from '$lib/services/auth';
 	import { FirestoreEntryRepository } from '$lib/services/entry-repository';
+	import { buildExportBundle, downloadExport } from '$lib/services/export';
 	import { boundedClientSearch } from '$lib/services/search';
 	import type { ValidatedEntryInput } from '$lib/validation/entry';
 
-	type View = 'active' | 'archived' | 'trashed';
+	type View =
+		'inbox' | 'events' | 'finances' | 'subscriptions' | 'verification' | 'archive' | 'trash';
+	type SubscriptionFilter =
+		| 'all'
+		| 'active'
+		| 'possibly-active'
+		| 'ended'
+		| 'unknown'
+		| 'confirmed'
+		| 'suspected'
+		| 'missing-amount'
+		| 'missing-cadence';
+
+	const viewTitles: Record<View, string> = {
+		inbox: 'Inbox',
+		events: 'Events',
+		finances: 'Finances',
+		subscriptions: 'Subscriptions',
+		verification: 'Verification',
+		archive: 'Archive',
+		trash: 'Trash'
+	};
+	const appVersion = '0.1.0';
 
 	let services: FirebaseServices | undefined = $state();
 	let repository: FirestoreEntryRepository | undefined = $state();
@@ -39,46 +61,69 @@
 	let signingIn = $state(false);
 	let entries: readonly Entry[] = $state([]);
 	let entriesLoading = $state(true);
-	let view: View = $state('active');
+	let view: View = $state('inbox');
 	let searchQuery = $state('');
+	let subscriptionFilter: SubscriptionFilter = $state('all');
 	let selectedEntry: Entry | null = $state(null);
 	let selectedEvents: readonly EntryEvent[] = $state([]);
 	let eventsLoading = $state(false);
 	let busyEntryId: string | null = $state(null);
-	let toast = $state('');
 	let appError = $state('');
 	let aiHealth: AiHealthResult | null = $state(null);
 	let aiChecking = $state(false);
+	let exporting = $state(false);
 
 	let stopEntries: (() => void) | undefined;
 	let stopEvents: (() => void) | undefined;
-	let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-	const counts = $derived({
-		active: entries.filter((entry) => entry.status === 'active').length,
-		archived: entries.filter((entry) => entry.status === 'archived').length,
-		trashed: entries.filter((entry) => entry.status === 'trashed').length
-	});
-	const visibleEntries = $derived(
-		boundedClientSearch.search(
-			entries.filter((entry) => entry.status === view),
-			searchQuery
-		)
+	const activeEntries = $derived(entries.filter((entry) => entry.status === 'active'));
+	const lifeEvents = $derived(
+		projectLifeEvents(boundedClientSearch.search(activeEntries, searchQuery))
 	);
+	const financialBaseline = $derived(buildFinancialBaseline(entries));
+	const subscriptions = $derived(projectSubscriptions(activeEntries));
+	const filteredSubscriptions = $derived(
+		subscriptions.filter((entry) => {
+			const recurrence = entry.recurrence;
+			if (!recurrence || subscriptionFilter === 'all') return true;
+			if (
+				subscriptionFilter === 'active' ||
+				subscriptionFilter === 'possibly-active' ||
+				subscriptionFilter === 'ended' ||
+				subscriptionFilter === 'unknown'
+			) {
+				return recurrence.activeState === subscriptionFilter;
+			}
+			if (subscriptionFilter === 'confirmed') {
+				return recurrence.verificationStatus === 'confirmed';
+			}
+			if (subscriptionFilter === 'suspected') {
+				return recurrence.verificationStatus === 'suspected';
+			}
+			if (subscriptionFilter === 'missing-amount') return entry.money === null;
+			return recurrence.cadence === 'unknown';
+		})
+	);
+	const unverifiedEntries = $derived(projectUnverified(entries));
+	const listEntries = $derived.by((): readonly Entry[] => {
+		if (view === 'inbox') return activeEntries;
+		if (view === 'subscriptions') return filteredSubscriptions;
+		if (view === 'verification') return unverifiedEntries;
+		if (view === 'archive') return entries.filter((entry) => entry.status === 'archived');
+		if (view === 'trash') return entries.filter((entry) => entry.status === 'trashed');
+		return [];
+	});
+	const visibleEntries = $derived(boundedClientSearch.search(listEntries, searchQuery));
 	const aiEnabled = $derived(aiDevToolsEnabled());
 
-	function errorMessage(error: unknown): string {
-		return error instanceof Error ? error.message : 'Something unexpected happened.';
-	}
-
-	function announce(message: string): void {
-		toast = message;
-		if (toastTimer) clearTimeout(toastTimer);
-		toastTimer = setTimeout(() => (toast = ''), 3_200);
-	}
-
 	function report(error: unknown): void {
-		appError = errorMessage(error);
+		void error;
+		appError = 'Failed. Retry.';
+	}
+
+	function setView(nextView: View): void {
+		view = nextView;
+		searchQuery = '';
 	}
 
 	function subscribeForUser(nextUser: User): void {
@@ -139,7 +184,6 @@
 				stopAuth();
 				stopEntries?.();
 				stopEvents?.();
-				if (toastTimer) clearTimeout(toastTimer);
 				window.removeEventListener('keydown', keyboardShortcut);
 			};
 		} catch (error) {
@@ -171,12 +215,10 @@
 	}
 
 	async function createEntry(input: ValidatedEntryInput): Promise<void> {
-		if (!repository || !user) throw new Error('Sign in before capturing a thought.');
+		if (!repository || !user) throw new Error('Add failed. Sign in.');
 		appError = '';
 		await repository.create(user.uid, input);
-		view = 'active';
-		searchQuery = '';
-		announce('Thought kept safely.');
+		setView('inbox');
 	}
 
 	function openEditor(entry: Entry): void {
@@ -222,7 +264,6 @@
 	async function resurface(entry: Entry): Promise<void> {
 		if (!repository || !user) return;
 		await withEntryBusy(entry, () => repository!.resurface(user!.uid, entry.id));
-		announce('Another resurfacing was recorded.');
 	}
 
 	async function changeStatus(entry: Entry, status: EntryStatus): Promise<void> {
@@ -230,19 +271,12 @@
 		await withEntryBusy(entry, () =>
 			repository!.changeStatus(user!.uid, entry.id, status, entry.status)
 		);
-		const labels: Record<EntryStatus, string> = {
-			active: 'Restored to the inbox.',
-			archived: 'Entry archived.',
-			trashed: 'Entry moved to trash.'
-		};
-		announce(labels[status]);
 		if (selectedEntry) closeEditor();
 	}
 
 	async function saveSelected(input: ValidatedEntryInput): Promise<void> {
 		if (!repository || !user || !selectedEntry) return;
 		await withEntryBusy(selectedEntry, () => repository!.update(user!.uid, selectedEntry!, input));
-		announce('Changes saved with history.');
 		closeEditor();
 	}
 
@@ -251,11 +285,10 @@
 		const entry = selectedEntry;
 		await withEntryBusy(entry, () => repository!.permanentlyDelete(user!.uid, entry.id));
 		closeEditor();
-		announce('Entry and its history were permanently deleted.');
 	}
 
 	async function reflectSelected() {
-		if (!aiClient || !selectedEntry) throw new Error('AI preview is unavailable.');
+		if (!aiClient || !selectedEntry) throw new Error('Preview failed. Retry.');
 		return aiClient.reflectOnEntry(selectedEntry.rawText, selectedEntry.notes ?? undefined);
 	}
 
@@ -271,82 +304,69 @@
 			aiChecking = false;
 		}
 	}
+
+	async function exportCorpus(): Promise<void> {
+		if (!repository || !user || exporting) return;
+		exporting = true;
+		appError = '';
+		try {
+			const allEntries = await repository.loadAll(user.uid);
+			const allEvents = await repository.loadAllEvents(user.uid, allEntries);
+			const now = new Date();
+			const bundle = buildExportBundle(allEntries, allEvents, { now, appVersion });
+			downloadExport(bundle, now);
+		} catch (error) {
+			report(error);
+		} finally {
+			exporting = false;
+		}
+	}
 </script>
 
 <svelte:head>
-	<title>Life Corpus — Private capture</title>
-	<meta name="description" content="A private, capture-first place for the thoughts that matter." />
 	<meta name="theme-color" content="#142421" />
 </svelte:head>
 
-{#if !authReady}
-	<main class="loading-screen">
-		<div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-		<p>Opening your corpus…</p>
-	</main>
-{:else if !user}
+{#if authReady && !user}
 	<main class="signin-screen">
-		<section class="signin-card">
-			<div class="brand-lockup">
-				<div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-				<span>Life Corpus</span>
-			</div>
-			<div class="signin-copy">
-				<p class="eyebrow">Private by design</p>
-				<h1>A trusted place for every thought that should not be lost.</h1>
-				<p>
-					Capture first. Understand later. Your original words stay intact while the shape of your
-					life becomes clearer over time.
-				</p>
-			</div>
-			<div class="trust-list">
-				<span><LockKeyhole size={17} aria-hidden="true" /> Signed-in access only</span>
-				<span><ShieldCheck size={17} aria-hidden="true" /> Isolated personal records</span>
+		<div class="signin-stack">
+			<div class="noema-card card">
+				<h1>Noema</h1>
 			</div>
 			<button class="signin-button" type="button" onclick={handleSignIn} disabled={signingIn}>
-				{#if services?.useEmulators}
-					<LockKeyhole size={18} aria-hidden="true" />
-					{signingIn ? 'Opening local vault…' : 'Enter local vault'}
-				{:else}
-					{signingIn ? 'Signing in…' : 'Continue with Google'}
-				{/if}
+				{signingIn ? 'Entering…' : 'Enter'}
 			</button>
-			{#if services?.useEmulators}
-				<p class="local-only">Local emulator only · no production account or data</p>
-			{/if}
 			{#if appError}<p class="signin-error" role="alert">{appError}</p>{/if}
-		</section>
-		<p class="signin-footnote">A thought captured is a thought made safe to forget.</p>
+		</div>
 	</main>
-{:else}
+{:else if user}
 	<div class="app-shell">
 		<aside class="sidebar">
-			<div class="brand-lockup">
-				<div class="brand-mark small" aria-hidden="true">
-					<span></span><span></span><span></span>
-				</div>
-				<span>Life Corpus</span>
-			</div>
-
-			<nav aria-label="Entry views">
-				<button class:active={view === 'active'} type="button" onclick={() => (view = 'active')}>
-					<Inbox size={18} aria-hidden="true" />
-					<span>Inbox</span>
-					<strong>{counts.active}</strong>
+			<nav aria-label="Views">
+				<button class:active={view === 'inbox'} type="button" onclick={() => setView('inbox')}>
+					Inbox
 				</button>
-				<button
-					class:active={view === 'archived'}
-					type="button"
-					onclick={() => (view = 'archived')}
+				<button class:active={view === 'events'} type="button" onclick={() => setView('events')}>
+					Life events
+				</button>
+				<button class:active={view === 'finances'} type="button" onclick={() => setView('finances')}
+					>Financial baseline</button
 				>
-					<Archive size={18} aria-hidden="true" />
-					<span>Archive</span>
-					<strong>{counts.archived}</strong>
-				</button>
-				<button class:active={view === 'trashed'} type="button" onclick={() => (view = 'trashed')}>
-					<Trash2 size={18} aria-hidden="true" />
-					<span>Trash</span>
-					<strong>{counts.trashed}</strong>
+				<button
+					class:active={view === 'subscriptions'}
+					type="button"
+					onclick={() => setView('subscriptions')}>Subscriptions</button
+				>
+				<button
+					class:active={view === 'verification'}
+					type="button"
+					onclick={() => setView('verification')}>Needs verification</button
+				>
+				<button class:active={view === 'archive'} type="button" onclick={() => setView('archive')}
+					>Archive</button
+				>
+				<button class:active={view === 'trash'} type="button" onclick={() => setView('trash')}>
+					Trash
 				</button>
 			</nav>
 
@@ -354,31 +374,22 @@
 
 			{#if aiEnabled}
 				<section class="ai-connectivity" aria-labelledby="ai-connectivity-title">
-					<div>
-						<BrainCircuit size={17} aria-hidden="true" />
-						<strong id="ai-connectivity-title">AI boundary</strong>
-					</div>
-					<p>Developer-only connectivity. Responses are not saved.</p>
+					<strong id="ai-connectivity-title">AI</strong>
 					<button type="button" onclick={checkAi} disabled={aiChecking}>
-						{aiChecking ? 'Checking…' : aiHealth ? 'Check again' : 'Run health check'}
+						{aiChecking ? 'Checking…' : 'Check'}
 					</button>
 					{#if aiHealth}
 						<small class:healthy={aiHealth.ok}>
-							{aiHealth.ok ? 'Ready' : 'Unavailable'} · {aiHealth.metadata.provider}
+							{aiHealth.ok ? 'OK' : 'Error'} · {aiHealth.metadata.provider}
 						</small>
 					{/if}
 				</section>
 			{/if}
 
 			<div class="account-row">
-				<div>
-					<span class="avatar">{user.isAnonymous ? 'L' : (user.displayName?.[0] ?? 'Y')}</span>
-					<p>
-						<strong>{user.isAnonymous ? 'Local vault' : (user.displayName ?? 'Your corpus')}</strong
-						>
-						<small>{user.isAnonymous ? 'Emulator identity' : user.email}</small>
-					</p>
-				</div>
+				<button type="button" onclick={exportCorpus} disabled={exporting}>
+					{exporting ? 'Exporting…' : 'Export'}
+				</button>
 				<button class="icon-button" type="button" aria-label="Sign out" onclick={handleSignOut}>
 					<LogOut size={18} aria-hidden="true" />
 				</button>
@@ -387,79 +398,87 @@
 
 		<main class="main-content">
 			<header class="mobile-header">
-				<div class="brand-lockup">
-					<div class="brand-mark small" aria-hidden="true">
-						<span></span><span></span><span></span>
-					</div>
-					<span>Life Corpus</span>
-				</div>
-				<div class="mobile-nav">
-					<button
-						class:active={view === 'active'}
-						onclick={() => (view = 'active')}
-						aria-label="Inbox"
-					>
-						<Inbox size={18} />
-					</button>
-					<button
-						class:active={view === 'archived'}
-						onclick={() => (view = 'archived')}
-						aria-label="Archive"
-					>
-						<Archive size={18} />
-					</button>
-					<button
-						class:active={view === 'trashed'}
-						onclick={() => (view = 'trashed')}
-						aria-label="Trash"
-					>
-						<Trash2 size={18} />
+				<label class="mobile-view">
+					<span class="sr-only">View</span>
+					<select bind:value={view} onchange={() => (searchQuery = '')}>
+						<option value="inbox">Inbox</option>
+						<option value="events">Life events</option>
+						<option value="finances">Financial baseline</option>
+						<option value="subscriptions">Subscriptions</option>
+						<option value="verification">Needs verification</option>
+						<option value="archive">Archive</option>
+						<option value="trash">Trash</option>
+					</select>
+				</label>
+				<div class="mobile-actions">
+					<button type="button" onclick={exportCorpus} disabled={exporting}>Export</button>
+					<button class="icon-button" type="button" aria-label="Sign out" onclick={handleSignOut}>
+						<LogOut size={18} aria-hidden="true" />
 					</button>
 				</div>
 			</header>
 
 			<CaptureComposer onCreate={createEntry} />
 
-			<section class="inbox-section" aria-labelledby="inbox-heading">
-				<div class="inbox-toolbar">
-					<div>
-						<p class="eyebrow">Your corpus</p>
-						<h2 id="inbox-heading">
-							{view === 'active' ? 'Inbox' : view === 'archived' ? 'Archive' : 'Trash'}
-						</h2>
-					</div>
-					<label class="search-box">
-						<Search size={17} aria-hidden="true" />
-						<span class="sr-only">Search entries</span>
-						<input type="search" placeholder="Search your entries" bind:value={searchQuery} />
-						{#if searchQuery}
-							<button type="button" aria-label="Clear search" onclick={() => (searchQuery = '')}>
-								<X size={15} aria-hidden="true" />
-							</button>
-						{/if}
-					</label>
+			<section class="inbox-section" aria-labelledby="view-title">
+				<div class="view-heading">
+					<h2 id="view-title">{viewTitles[view]}</h2>
 				</div>
+
+				{#if view !== 'finances'}
+					<div class="inbox-toolbar">
+						<label class="search-box">
+							<Search size={17} aria-hidden="true" />
+							<span class="sr-only">Search</span>
+							<input type="search" bind:value={searchQuery} />
+							{#if searchQuery}
+								<button type="button" aria-label="Clear" onclick={() => (searchQuery = '')}>
+									<X size={15} aria-hidden="true" />
+								</button>
+							{/if}
+						</label>
+						{#if view === 'subscriptions'}
+							<label class="filter-field">
+								<span class="sr-only">Filter</span>
+								<select bind:value={subscriptionFilter}>
+									<option value="all">All</option>
+									<option value="active">Active</option>
+									<option value="possibly-active">Possibly active</option>
+									<option value="ended">Ended</option>
+									<option value="unknown">Unknown</option>
+									<option value="confirmed">Confirmed</option>
+									<option value="suspected">Suspected</option>
+									<option value="missing-amount">Missing amount</option>
+									<option value="missing-cadence">Missing cadence</option>
+								</select>
+							</label>
+						{/if}
+					</div>
+				{/if}
 
 				{#if appError}
 					<div class="error-banner" role="alert">
 						<span>{appError}</span>
-						<button type="button" aria-label="Dismiss error" onclick={() => (appError = '')}>
+						<button type="button" aria-label="Dismiss" onclick={() => (appError = '')}>
 							<X size={17} aria-hidden="true" />
 						</button>
 					</div>
 				{/if}
 
 				{#if entriesLoading}
-					<div class="entry-list" aria-label="Loading entries">
-						{#each [1, 2, 3] as item (item)}
-							<div class="entry-skeleton" aria-hidden="true" data-item={item}></div>
-						{/each}
-					</div>
+					<p class="empty-inline">Loading</p>
+				{:else if view === 'events'}
+					<LifeEventsView projection={lifeEvents} onOpen={openEditor} />
+				{:else if view === 'finances'}
+					<FinancialBaselineView baseline={financialBaseline} onOpen={openEditor} />
 				{:else if visibleEntries.length > 0}
 					<div class="entry-list">
 						{#each visibleEntries as entry (entry.id)}
 							<EntryCard
 								{entry}
+								markers={view === 'verification'
+									? verificationReasonsForCorpus(entries, entry)
+									: []}
 								busy={busyEntryId === entry.id}
 								onOpen={openEditor}
 								onResurface={resurface}
@@ -469,38 +488,8 @@
 							/>
 						{/each}
 					</div>
-					<p class="result-note">
-						Showing {visibleEntries.length} of {counts[view]}
-						{view === 'active' ? 'inbox' : view} entries · search runs locally over the latest 500
-					</p>
 				{:else}
-					<div class="empty-state">
-						<div class="empty-symbol" aria-hidden="true">
-							{#if searchQuery}<Search size={24} />{:else if view === 'active'}<Inbox
-									size={24}
-								/>{:else if view === 'archived'}<Archive size={24} />{:else}<Trash2
-									size={24}
-								/>{/if}
-						</div>
-						<h3>
-							{searchQuery
-								? 'Nothing matches that search'
-								: view === 'active'
-									? 'Your inbox is quiet'
-									: view === 'archived'
-										? 'Nothing archived yet'
-										: 'Trash is empty'}
-						</h3>
-						<p>
-							{searchQuery
-								? 'Try fewer words or search the original phrasing.'
-								: view === 'active'
-									? 'The next thought you keep will appear here immediately.'
-									: view === 'archived'
-										? 'Archived thoughts remain preserved and searchable.'
-										: 'Entries in trash can be restored or permanently deleted.'}
-						</p>
-					</div>
+					<div class="empty-state"><p>Empty</p></div>
 				{/if}
 			</section>
 		</main>
@@ -521,9 +510,5 @@
 			onDelete={deleteSelected}
 			onReflect={reflectSelected}
 		/>
-	{/if}
-
-	{#if toast}
-		<div class="toast" role="status"><ShieldCheck size={17} aria-hidden="true" /> {toast}</div>
 	{/if}
 {/if}

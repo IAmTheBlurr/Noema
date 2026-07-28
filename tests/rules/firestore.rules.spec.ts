@@ -39,6 +39,37 @@ function validEntry(ownerId: string) {
 	};
 }
 
+function validStructuredEntry(ownerId: string) {
+	return {
+		...validEntry(ownerId),
+		captureIntent: 'recurring-commitment',
+		money: { minorUnits: 1299, currency: 'USD' },
+		temporal: {
+			rawText: 'August 2022',
+			earliest: '2022-08-01',
+			latest: '2022-08-31',
+			precision: 'month',
+			source: 'human',
+			reviewedByUser: true
+		},
+		standingRecord: {
+			subjectHint: 'rent',
+			valueText: 'Current rent',
+			verificationStatus: 'confirmed',
+			state: 'current'
+		},
+		recurrence: {
+			recurringKind: 'subscription',
+			cadence: 'monthly',
+			interval: 1,
+			verificationStatus: 'suspected',
+			activeState: 'possibly-active',
+			autoRenew: true
+		},
+		schemaVersion: 2
+	};
+}
+
 async function seedEntry(ownerId: string, entryId = 'entry-one'): Promise<void> {
 	await environment.withSecurityRulesDisabled(async (context) => {
 		await setDoc(
@@ -81,6 +112,14 @@ describe('Life Corpus Firestore isolation', () => {
 		const entryRef = doc(collection(db, 'users/alice/entries'), 'new-entry');
 
 		await assertSucceeds(setDoc(entryRef, validEntry('alice')));
+		await assertSucceeds(getDoc(entryRef));
+	});
+
+	it('accepts valid sparse structured fields', async () => {
+		const db = environment.authenticatedContext('alice').firestore();
+		const entryRef = doc(collection(db, 'users/alice/entries'), 'structured');
+
+		await assertSucceeds(setDoc(entryRef, validStructuredEntry('alice')));
 		await assertSucceeds(getDoc(entryRef));
 	});
 
@@ -129,6 +168,24 @@ describe('Life Corpus Firestore isolation', () => {
 			setDoc(entryRef, {
 				...validEntry('alice'),
 				money: { amount: -1, currency: 'dollars' }
+			})
+		);
+		await assertFails(
+			setDoc(entryRef, {
+				...validStructuredEntry('alice'),
+				recurrence: {
+					...validStructuredEntry('alice').recurrence,
+					interval: 0
+				}
+			})
+		);
+		await assertFails(
+			setDoc(entryRef, {
+				...validStructuredEntry('alice'),
+				temporal: {
+					...validStructuredEntry('alice').temporal,
+					confidence: 2
+				}
 			})
 		);
 	});

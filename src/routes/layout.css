@@ -160,13 +160,32 @@ button {
 		radial-gradient(circle at 22% 18%, #54746a, #10221e 68%);
 }
 
-.signin-card {
-	width: min(100%, 510px);
-	padding: clamp(1.75rem, 5vw, 3.2rem);
+.signin-stack {
+	display: grid;
+	width: min(100%, 420px);
+	justify-items: center;
+	gap: 1.25rem;
+}
+
+.noema-card {
+	display: grid;
+	width: 100%;
+	padding: clamp(3rem, 9vw, 5rem) clamp(3.5rem, 11vw, 6rem);
+	place-items: center;
 	border: 1px solid rgba(255, 255, 255, 0.14);
-	border-radius: 24px;
 	background: rgba(252, 251, 247, 0.97);
 	box-shadow: 0 30px 80px rgba(0, 0, 0, 0.27);
+}
+
+.noema-card h1 {
+	width: 100%;
+	margin: 0;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: clamp(3.25rem, 12vw, 5.5rem);
+	font-weight: 600;
+	letter-spacing: -0.045em;
+	line-height: 1;
+	text-align: center;
 }
 
 .signin-copy {
@@ -234,7 +253,7 @@ button:disabled {
 }
 
 .signin-button {
-	width: 100%;
+	width: 38.2%;
 	padding: 0.9rem 1.1rem;
 }
 
@@ -501,9 +520,17 @@ button:disabled {
 	margin-top: 1.35rem;
 }
 
+.capture-form-fields {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
 .capture-shell textarea,
 .editor-form textarea,
-.field input {
+.field input,
+.field select {
 	width: 100%;
 	border: 1px solid var(--line);
 	border-radius: 9px;
@@ -527,7 +554,8 @@ input::placeholder {
 
 .capture-shell textarea:focus,
 .editor-form textarea:focus,
-.field input:focus {
+.field input:focus,
+.field select:focus {
 	border-color: var(--brand);
 	outline: 3px solid color-mix(in srgb, var(--brand) 12%, transparent);
 }
@@ -620,7 +648,8 @@ input::placeholder {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
 	padding: 0.68rem 0.75rem;
 	font-size: 0.82rem;
 }
@@ -1238,6 +1267,220 @@ input::placeholder {
 	animation: toast-in 160ms ease-out;
 }
 
+.intent-selector {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.25rem;
+	margin-bottom: 0.8rem;
+	padding: 0.25rem;
+	border: 1px solid var(--line-soft);
+	border-radius: 9px;
+	background: var(--panel);
+}
+
+.intent-selector button {
+	min-height: 36px;
+	padding: 0.42rem 0.5rem;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 0.7rem;
+	cursor: pointer;
+}
+
+.intent-selector button.active {
+	background: var(--brand-soft);
+	color: var(--brand-deep);
+	font-weight: 700;
+}
+
+.capability-fields {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.9rem;
+	min-width: 0;
+	margin: 0;
+	padding: 1rem;
+	border: 1px solid var(--line-soft);
+	border-radius: 10px;
+}
+
+.capability-fields legend {
+	padding: 0 0.35rem;
+	color: var(--muted);
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+
+.check-field {
+	display: flex;
+	align-items: center;
+	align-self: end;
+	gap: 0.5rem;
+	min-height: 38px;
+	color: var(--muted);
+	font-size: 0.72rem;
+	font-weight: 650;
+}
+
+.check-field input {
+	width: 18px;
+	height: 18px;
+	accent-color: var(--brand);
+}
+
+.capability-switch {
+	grid-column: 1 / -1;
+	width: fit-content;
+}
+
+.editor-form .optional-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
+}
+
+.view-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1rem;
+}
+
+.view-heading h2 {
+	margin: 0;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 1.7rem;
+	font-weight: 500;
+}
+
+.filter-field select,
+.mobile-view select {
+	min-height: 38px;
+	padding: 0.5rem 2rem 0.5rem 0.65rem;
+	border: 1px solid var(--line);
+	border-radius: 9px;
+	background: var(--panel);
+	color: var(--ink);
+	font-size: 0.75rem;
+}
+
+.account-row > button:not(.icon-button),
+.mobile-actions > button:not(.icon-button) {
+	padding: 0.45rem 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--muted);
+	font-size: 0.7rem;
+	cursor: pointer;
+}
+
+.mobile-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.projection-section + .projection-section {
+	margin-top: 1.5rem;
+}
+
+.projection-section h3 {
+	margin: 0 0 0.65rem;
+	color: var(--muted);
+	font-size: 0.76rem;
+}
+
+.projection-list {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.projection-row {
+	display: grid;
+	grid-template-columns: minmax(110px, 0.35fr) minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.8rem;
+	width: 100%;
+	min-height: 64px;
+	padding: 0.8rem 1rem;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel-strong);
+	color: var(--ink);
+	text-align: left;
+	cursor: pointer;
+}
+
+.projection-row strong {
+	overflow: hidden;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 0.9rem;
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.projection-value,
+.projection-status {
+	color: var(--muted);
+	font-size: 0.69rem;
+}
+
+.projection-status {
+	text-transform: capitalize;
+}
+
+.empty-inline {
+	margin: 1rem 0 0;
+	color: var(--muted);
+	font-size: 0.78rem;
+}
+
+.baseline-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.7rem;
+}
+
+.baseline-value {
+	display: grid;
+	align-content: start;
+	gap: 0.45rem;
+	min-height: 104px;
+	padding: 1rem;
+	border: 1px solid var(--line);
+	border-radius: 11px;
+	background: var(--panel-strong);
+	color: var(--ink);
+	text-align: left;
+}
+
+button.baseline-value {
+	cursor: pointer;
+}
+
+.baseline-value span,
+.baseline-value small {
+	color: var(--muted);
+	font-size: 0.69rem;
+}
+
+.baseline-value strong {
+	overflow-wrap: anywhere;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 1rem;
+	font-weight: 500;
+}
+
+.baseline-value.missing {
+	color: var(--muted);
+}
+
 @keyframes shimmer {
 	to {
 		background-position: -200% 0;
@@ -1276,6 +1519,16 @@ input::placeholder {
 		align-items: center;
 		justify-content: space-between;
 		height: 66px;
+		gap: 0.75rem;
+	}
+
+	.mobile-view {
+		min-width: 0;
+		flex: 1;
+	}
+
+	.mobile-view select {
+		width: 100%;
 	}
 
 	.mobile-nav {
@@ -1319,6 +1572,10 @@ input::placeholder {
 	.inbox-section {
 		margin-top: 2.2rem;
 	}
+
+	.baseline-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 }
 
 @media (max-width: 560px) {
@@ -1327,9 +1584,8 @@ input::placeholder {
 		place-content: center;
 	}
 
-	.signin-card {
-		padding: 1.5rem;
-		border-radius: 18px;
+	.noema-card {
+		padding: 2.75rem 2.25rem;
 	}
 
 	.signin-copy {
@@ -1338,6 +1594,10 @@ input::placeholder {
 
 	.capture-heading h1 {
 		max-width: 280px;
+	}
+
+	.intent-selector {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	.capture-actions {
@@ -1365,6 +1625,15 @@ input::placeholder {
 		grid-column: 1;
 	}
 
+	.capability-fields {
+		grid-template-columns: 1fr;
+		padding: 0.8rem;
+	}
+
+	.capability-fields .field {
+		grid-column: 1;
+	}
+
 	.inbox-toolbar {
 		align-items: stretch;
 		flex-direction: column;
@@ -1372,6 +1641,29 @@ input::placeholder {
 
 	.search-box {
 		width: 100%;
+	}
+
+	.projection-row {
+		grid-template-columns: 1fr auto;
+	}
+
+	.projection-row strong {
+		grid-column: 1 / -1;
+		grid-row: 1;
+	}
+
+	.projection-value {
+		grid-column: 1;
+		grid-row: 2;
+	}
+
+	.projection-status {
+		grid-column: 2;
+		grid-row: 2;
+	}
+
+	.baseline-grid {
+		grid-template-columns: 1fr;
 	}
 
 	.entry-card {
@@ -1435,7 +1727,7 @@ input::placeholder {
 		--shadow: 0 14px 35px rgba(0, 0, 0, 0.24);
 	}
 
-	.signin-card {
+	.noema-card {
 		background: rgba(25, 37, 33, 0.98);
 	}
 

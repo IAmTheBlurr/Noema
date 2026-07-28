@@ -6,14 +6,223 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    function validOptionalString(value, maxLength) {
+      return value == null || (value is string && value.size() <= maxLength);
+    }
+
+    function validSchemaVersion(value) {
+      return value == 1 || value == 2;
+    }
+
+    function validMoney(value) {
+      return value == null || (
+        value is map &&
+        value.currency is string &&
+        value.currency.matches('^[A-Z]{3}$') &&
+        (
+          (
+            value.keys().hasOnly(['amount', 'currency']) &&
+            value.amount is number &&
+            value.amount >= 0 &&
+            value.amount <= 1000000000000
+          ) ||
+          (
+            value.keys().hasOnly(['minorUnits', 'currency']) &&
+            value.minorUnits is int &&
+            value.minorUnits >= 0 &&
+            value.minorUnits <= 100000000000000
+          )
+        )
+      );
+    }
+
+    function validStatus(value) {
+      return value == 'active' || value == 'archived' || value == 'trashed';
+    }
+
+    function validCaptureIntent(value) {
+      return value == 'thought' ||
+        value == 'life-event' ||
+        value == 'standing-record' ||
+        value == 'recurring-commitment';
+    }
+
+    function validPrecision(value) {
+      return value == 'exact' ||
+        value == 'day' ||
+        value == 'month' ||
+        value == 'season' ||
+        value == 'year' ||
+        value == 'range' ||
+        value == 'relative' ||
+        value == 'unknown';
+    }
+
+    function validTemporalSource(value) {
+      return value == 'human' ||
+        value == 'llm-inferred' ||
+        value == 'document-derived' ||
+        value == 'system-derived';
+    }
+
+    function validTemporal(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasOnly([
+          'rawText',
+          'earliest',
+          'latest',
+          'precision',
+          'source',
+          'confidence',
+          'reviewedByUser'
+        ]) &&
+        validOptionalString(value.get('rawText', null), 500) &&
+        validOptionalString(value.get('earliest', null), 10) &&
+        validOptionalString(value.get('latest', null), 10) &&
+        validPrecision(value.precision) &&
+        validTemporalSource(value.source) &&
+        value.reviewedByUser is bool &&
+        (
+          !value.keys().hasAny(['confidence']) ||
+          (
+            value.confidence is number &&
+            value.confidence >= 0 &&
+            value.confidence <= 1
+          )
+        )
+      );
+    }
+
+    function validVerification(value) {
+      return value == 'remembered' ||
+        value == 'suspected' ||
+        value == 'confirmed' ||
+        value == 'changed' ||
+        value == 'ended' ||
+        value == 'disputed';
+    }
+
+    function validStandingSubject(value) {
+      return value == null ||
+        value == 'salary' ||
+        value == 'pay-frequency' ||
+        value == 'rent' ||
+        value == 'employment' ||
+        value == 'bank' ||
+        value == 'vehicle' ||
+        value == 'housing' ||
+        value == 'insurance' ||
+        value == 'other';
+    }
+
+    function validStanding(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasOnly([
+          'subjectHint',
+          'valueText',
+          'effectiveFrom',
+          'effectiveUntil',
+          'verificationStatus',
+          'state'
+        ]) &&
+        validStandingSubject(value.get('subjectHint', null)) &&
+        validOptionalString(value.get('valueText', null), 2000) &&
+        validTemporal(value.get('effectiveFrom', null)) &&
+        validTemporal(value.get('effectiveUntil', null)) &&
+        validVerification(value.verificationStatus) &&
+        (
+          value.state == 'current' ||
+          value.state == 'ended' ||
+          value.state == 'unknown'
+        )
+      );
+    }
+
+    function validRecurringKind(value) {
+      return value == null ||
+        value == 'subscription' ||
+        value == 'rent' ||
+        value == 'utility' ||
+        value == 'insurance' ||
+        value == 'membership' ||
+        value == 'debt-payment' ||
+        value == 'income' ||
+        value == 'transfer' ||
+        value == 'other';
+    }
+
+    function validCadence(value) {
+      return value == 'weekly' ||
+        value == 'biweekly' ||
+        value == 'semimonthly' ||
+        value == 'monthly' ||
+        value == 'quarterly' ||
+        value == 'yearly' ||
+        value == 'irregular' ||
+        value == 'unknown';
+    }
+
+    function validRecurrence(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasOnly([
+          'recurringKind',
+          'cadence',
+          'interval',
+          'dueDescription',
+          'effectiveFrom',
+          'effectiveUntil',
+          'verificationStatus',
+          'activeState',
+          'autoRenew',
+          'paymentSourceText',
+          'cancellationUrl',
+          'lastKnownCharge'
+        ]) &&
+        validRecurringKind(value.get('recurringKind', null)) &&
+        validCadence(value.cadence) &&
+        (
+          !value.keys().hasAny(['interval']) ||
+          (
+            value.interval is int &&
+            value.interval > 0 &&
+            value.interval <= 1000
+          )
+        ) &&
+        validOptionalString(value.get('dueDescription', null), 500) &&
+        validTemporal(value.get('effectiveFrom', null)) &&
+        validTemporal(value.get('effectiveUntil', null)) &&
+        validVerification(value.verificationStatus) &&
+        (
+          value.activeState == 'active' ||
+          value.activeState == 'possibly-active' ||
+          value.activeState == 'ended' ||
+          value.activeState == 'unknown'
+        ) &&
+        (
+          !value.keys().hasAny(['autoRenew']) ||
+          value.autoRenew is bool
+        ) &&
+        validOptionalString(value.get('paymentSourceText', null), 500) &&
+        validOptionalString(value.get('cancellationUrl', null), 2048) &&
+        validTemporal(value.get('lastKnownCharge', null))
+      );
+    }
+
     function hasOnlyEntryFields(data) {
       return data.keys().hasOnly([
         'ownerId',
         'rawText',
+        'captureIntent',
         'url',
         'money',
         'notes',
         'timeHorizon',
+        'temporal',
+        'standingRecord',
+        'recurrence',
         'status',
         'recurrenceCount',
         'createdAt',
@@ -24,45 +233,29 @@ service cloud.firestore {
       ]);
     }
 
-    function validOptionalString(value, maxLength) {
-      return value == null || (value is string && value.size() <= maxLength);
-    }
-
-    function validMoney(value) {
-      return value == null || (
-        value is map &&
-        value.keys().hasOnly(['amount', 'currency']) &&
-        value.amount is number &&
-        value.amount >= 0 &&
-        value.amount <= 1000000000000 &&
-        value.currency is string &&
-        value.currency.matches('^[A-Z]{3}$')
-      );
-    }
-
-    function validStatus(value) {
-      return value == 'active' || value == 'archived' || value == 'trashed';
-    }
-
     function validEntry(data, uid) {
       return hasOnlyEntryFields(data) &&
         data.ownerId == uid &&
         data.rawText is string &&
         data.rawText.size() > 0 &&
         data.rawText.size() <= 10000 &&
-        validOptionalString(data.url, 2048) &&
-        validMoney(data.money) &&
-        validOptionalString(data.notes, 20000) &&
-        validOptionalString(data.timeHorizon, 500) &&
+        validCaptureIntent(data.get('captureIntent', 'thought')) &&
+        validOptionalString(data.get('url', null), 2048) &&
+        validMoney(data.get('money', null)) &&
+        validOptionalString(data.get('notes', null), 20000) &&
+        validOptionalString(data.get('timeHorizon', null), 500) &&
+        validTemporal(data.get('temporal', null)) &&
+        validStanding(data.get('standingRecord', null)) &&
+        validRecurrence(data.get('recurrence', null)) &&
         validStatus(data.status) &&
         data.recurrenceCount is int &&
         data.recurrenceCount >= 0 &&
         data.recurrenceCount <= 1000000 &&
-        data.schemaVersion == 1 &&
+        validSchemaVersion(data.schemaVersion) &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp &&
-        (data.archivedAt == null || data.archivedAt is timestamp) &&
-        (data.trashedAt == null || data.trashedAt is timestamp);
+        (data.get('archivedAt', null) == null || data.archivedAt is timestamp) &&
+        (data.get('trashedAt', null) == null || data.trashedAt is timestamp);
     }
 
     function hasOnlyEventFields(data) {
@@ -84,10 +277,10 @@ service cloud.firestore {
         value.rawText is string &&
         value.rawText.size() > 0 &&
         value.rawText.size() <= 10000 &&
-        validOptionalString(value.url, 2048) &&
-        validMoney(value.money) &&
-        validOptionalString(value.notes, 20000) &&
-        validOptionalString(value.timeHorizon, 500)
+        validOptionalString(value.get('url', null), 2048) &&
+        validMoney(value.get('money', null)) &&
+        validOptionalString(value.get('notes', null), 20000) &&
+        validOptionalString(value.get('timeHorizon', null), 500)
       );
     }
 
@@ -98,7 +291,14 @@ service cloud.firestore {
         value == 'archived' ||
         value == 'restored' ||
         value == 'trashed' ||
-        value == 'restored_from_trash';
+        value == 'restored_from_trash' ||
+        value == 'capture_intent_changed' ||
+        value == 'temporal_details_changed' ||
+        value == 'standing_record_changed' ||
+        value == 'recurrence_changed' ||
+        value == 'verification_changed' ||
+        value == 'record_ended' ||
+        value == 'record_reactivated';
     }
 
     function validEvent(data, uid, entryId) {
@@ -107,7 +307,7 @@ service cloud.firestore {
         data.entryId == entryId &&
         validEventType(data.type) &&
         data.occurredAt is timestamp &&
-        data.schemaVersion == 1 &&
+        validSchemaVersion(data.schemaVersion) &&
         (!data.keys().hasAny(['revision']) || validRevision(data.revision)) &&
         (!data.keys().hasAny(['changedFields']) ||
           (data.changedFields is list && data.changedFields.size() <= 20));
@@ -123,6 +323,7 @@ service cloud.firestore {
           resource.data.ownerId == uid &&
           request.resource.data.ownerId == resource.data.ownerId &&
           request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.schemaVersion >= resource.data.schemaVersion &&
           validEntry(request.resource.data, uid);
         allow delete: if false;
 

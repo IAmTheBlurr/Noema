@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { Archive, ArrowUpRight, Clock3, MoreHorizontal, RotateCcw, Trash2 } from '@lucide/svelte';
+	import { MoreHorizontal } from '@lucide/svelte';
 
-	import type { Entry } from '$lib/domain/entry';
+	import type { CaptureIntent, Entry, Money } from '$lib/domain/entry';
 
 	let {
 		entry,
 		busy = false,
+		markers = [],
 		onOpen,
 		onResurface,
 		onArchive,
@@ -14,6 +15,7 @@
 	}: {
 		entry: Entry;
 		busy?: boolean;
+		markers?: readonly string[];
 		onOpen: (entry: Entry) => void;
 		onResurface: (entry: Entry) => void;
 		onArchive: (entry: Entry) => void;
@@ -29,15 +31,22 @@
 		minute: '2-digit'
 	});
 
-	function formatMoney(amount: number, currency: string): string {
+	const intentLabels: Record<CaptureIntent, string> = {
+		thought: 'Thought',
+		'life-event': 'Event',
+		'standing-record': 'Standing',
+		'recurring-commitment': 'Recurring'
+	};
+
+	function formatMoney(money: Money): string {
 		try {
-			return new Intl.NumberFormat(undefined, {
+			return new Intl.NumberFormat('en-US', {
 				style: 'currency',
-				currency,
+				currency: money.currency,
 				maximumFractionDigits: 2
-			}).format(amount);
+			}).format(money.minorUnits / 100);
 		} catch {
-			return `${amount.toLocaleString()} ${currency}`;
+			return `${(money.minorUnits / 100).toLocaleString('en-US')} ${money.currency}`;
 		}
 	}
 </script>
@@ -46,19 +55,22 @@
 	<button class="card-main" type="button" onclick={() => onOpen(entry)}>
 		<p class="entry-text">{entry.rawText}</p>
 		<div class="entry-meta">
-			<span title={entry.createdAt.toLocaleString()}>
-				<Clock3 size={14} aria-hidden="true" />
-				{dateFormatter.format(entry.createdAt)}
-			</span>
+			<span>{intentLabels[entry.captureIntent]}</span>
+			<span>{dateFormatter.format(entry.createdAt)}</span>
 			{#if entry.money}
-				<span class="amount">{formatMoney(entry.money.amount, entry.money.currency)}</span>
+				<span class="amount">{formatMoney(entry.money)}</span>
 			{/if}
-			{#if entry.url}
-				<span><ArrowUpRight size={14} aria-hidden="true" /> Link</span>
+			{#if entry.temporal?.rawText || entry.timeHorizon}
+				<span class="horizon">{entry.temporal?.rawText ?? entry.timeHorizon}</span>
+			{:else if entry.temporal?.earliest}
+				<span class="horizon">{entry.temporal.earliest}</span>
 			{/if}
-			{#if entry.timeHorizon}
-				<span class="horizon">{entry.timeHorizon}</span>
+			{#if entry.recurrence}
+				<span>{entry.recurrence.activeState}</span>
 			{/if}
+			{#each markers as marker (marker)}
+				<span>{marker}</span>
+			{/each}
 		</div>
 	</button>
 
@@ -67,29 +79,22 @@
 			<button
 				class="remember-button"
 				type="button"
-				title="I remembered this again"
-				aria-label={`Remembered again. Current recurrence count ${entry.recurrenceCount}`}
 				onclick={() => onResurface(entry)}
 				disabled={busy}
 			>
-				<RotateCcw size={16} aria-hidden="true" />
-				<span>{entry.recurrenceCount}</span>
+				Repeat
 			</button>
 		{/if}
 
 		<details class="card-menu">
-			<summary aria-label="Entry actions">
+			<summary aria-label="Actions">
 				<MoreHorizontal size={19} aria-hidden="true" />
 			</summary>
 			<div class="menu-panel">
 				{#if entry.status === 'active'}
-					<button type="button" onclick={() => onArchive(entry)} disabled={busy}>
-						<Archive size={16} aria-hidden="true" /> Archive
-					</button>
+					<button type="button" onclick={() => onArchive(entry)} disabled={busy}> Archive </button>
 				{:else}
-					<button type="button" onclick={() => onRestore(entry)} disabled={busy}>
-						<RotateCcw size={16} aria-hidden="true" /> Restore to inbox
-					</button>
+					<button type="button" onclick={() => onRestore(entry)} disabled={busy}> Restore </button>
 				{/if}
 				{#if entry.status !== 'trashed'}
 					<button
@@ -98,7 +103,7 @@
 						onclick={() => onTrash(entry)}
 						disabled={busy}
 					>
-						<Trash2 size={16} aria-hidden="true" /> Move to trash
+						Delete
 					</button>
 				{/if}
 			</div>

@@ -20,7 +20,12 @@ export const boundedClientSearch: EntrySearchService = {
 					entry.notes ?? '',
 					entry.url ?? '',
 					entry.timeHorizon ?? '',
-					entry.money ? `${entry.money.amount} ${entry.money.currency}` : ''
+					entry.temporal?.rawText ?? '',
+					entry.standingRecord?.subjectHint ?? '',
+					entry.standingRecord?.valueText ?? '',
+					entry.recurrence?.recurringKind ?? '',
+					entry.recurrence?.paymentSourceText ?? '',
+					entry.money ? `${entry.money.minorUnits / 100} ${entry.money.currency}` : ''
 				].join(' ')
 			);
 			return terms.every((term) => haystack.includes(term));
