@@ -1,38 +1,29 @@
-# AGENTS.md
+# CLAUDE.md
 
-Instructions for coding agents working in this repository.
+Project memory. Read this before writing or modifying any UI.
 
-## Project overview
+<!-- Add project-specific sections here: commands, stack, architecture. -->
 
-A private, single-user web app. It has one user: its author. It will never be
-released, marketed, demoed, or onboarded to anyone else.
+## Audience
 
-<!-- Add setup, build, and test commands here. -->
-
-## Audience assumption
-
-The only reader is the author. He knows what the app does, chose to build it,
-and already trusts it. He does not need to be sold, taught, welcomed,
-reassured, or encouraged.
+Single-user tool. The only reader is its author. He knows what the app does,
+chose to build it, and already trusts it. He does not need to be sold, taught,
+welcomed, reassured, or encouraged.
 
 Never write for a prospective user, a first-time visitor, or an evaluator.
 There are none and there will never be any.
 
-## UI content style
-
-The governing constraint:
+## UI content: the one rule
 
 **Every string in the interface must be a label, a value, or an error.**
 
-| Kind | Definition |
-| --- | --- |
-| Label | Names a control or region. 1-3 words. No sentence. |
-| Value | User data or system state. |
-| Error | What failed and what to do. Only on failure. |
+- **Label** — names a control or region. 1-3 words. No sentence.
+- **Value** — user data or system state.
+- **Error** — what failed and what to do. Only on failure.
 
 If a string is none of these, delete it. Do not rewrite it shorter. Delete it.
 
-### Never remove
+## UI content: never remove
 
 These rules delete words and ornament. They never delete capability or
 information. The following always survive:
@@ -54,9 +45,9 @@ information. The following always survive:
 - **Empty regions.** Render the word `Empty`, or render nothing at all. Never
   render an empty container.
 
-### Prohibited
+## UI content: never generate
 
-Do not generate any of the following, in any form, under any justification:
+In any form, under any justification:
 
 - Taglines, slogans, mission statements, value propositions, hero copy
 - Epigraphs, aphorisms, philosophy, poetry, any sentence with a "voice"
@@ -75,7 +66,7 @@ Do not generate any of the following, in any form, under any justification:
 - Second person. No "you," "your," "let's," "we"
 - Adjectives and adverbs anywhere in the chrome
 
-### Required
+## UI content: always
 
 - Standard vocabulary over bespoke vocabulary, always.
 - Shorten by deleting whole strings, never by truncating a needed one into a
@@ -86,9 +77,9 @@ Do not generate any of the following, in any form, under any justification:
 - A control whose function is unambiguous from shape and position may carry
   no text at all.
 
-## Verification
+## Check before emitting
 
-Before emitting any UI, run this on every string and every element, in order:
+Run on every string and every element, in order:
 
 1. Delete it. Can the user still complete the task? If yes, it stays deleted.
 2. Does it restate something true of the app in general, independent of this
@@ -102,12 +93,12 @@ decorative icons, badges, and any container whose sole contents were deleted
 by the rules above. A container holding surviving content stays, with its
 existing visual treatment intact.
 
-## Out of scope
+## Do not touch
 
 These rules govern content only: what exists on screen and what it says.
 
-The visual language is settled and is not the agent's to revise. Do not change,
-and do not propose changing:
+The visual language is settled and is not yours to revise. Do not change, and
+do not propose changing:
 
 - Color palette, background treatment, accent colors
 - Typefaces, weights, type scale
@@ -129,5 +120,4 @@ Restraint is measured by count of elements, not by amount of space between them.
 
 ## When uncertain
 
-Emit less. Ask. Never fill a gap with copy. Report ambiguous cases in the final
-summary rather than resolving them by guessing.
+Emit less. Ask. Never fill a gap with copy.
