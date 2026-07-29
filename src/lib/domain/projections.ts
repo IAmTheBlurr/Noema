@@ -182,10 +182,10 @@ export function verificationReasons(
 		reasons.add('Verification');
 	}
 	if (recurrence?.activeState === 'possibly-active' || recurrence?.activeState === 'unknown') {
-		reasons.add('Active state');
+		reasons.add('Active State');
 	}
-	if (recurrence && isOutflow(entry) && !entry.money) reasons.add('Missing amount');
-	if (recurrence?.cadence === 'unknown') reasons.add('Missing cadence');
+	if (recurrence && isOutflow(entry) && !entry.money) reasons.add('Missing Amount');
+	if (recurrence?.cadence === 'unknown') reasons.add('Missing Cadence');
 	if (
 		entry.captureIntent === 'life-event' &&
 		(!entry.temporal ||
@@ -194,7 +194,7 @@ export function verificationReasons(
 	) {
 		reasons.add('Time');
 	}
-	if (standing?.state === 'current' && !standing.effectiveFrom) reasons.add('Missing start');
+	if (standing?.state === 'current' && !standing.effectiveFrom) reasons.add('Missing Start');
 	if (conflictingIds.has(entry.id)) reasons.add('Conflict');
 	return [...reasons];
 }

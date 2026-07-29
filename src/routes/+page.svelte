@@ -44,13 +44,44 @@
 
 	const viewTitles: Record<View, string> = {
 		inbox: 'Inbox',
-		events: 'Events',
-		finances: 'Finances',
+		events: 'Life Events',
+		finances: 'Financial Baseline',
 		subscriptions: 'Subscriptions',
-		verification: 'Verification',
+		verification: 'Needs Verification',
 		archive: 'Archive',
 		trash: 'Trash'
 	};
+	const viewOrder: readonly View[] = [
+		'inbox',
+		'events',
+		'finances',
+		'subscriptions',
+		'verification',
+		'archive',
+		'trash'
+	];
+	const subscriptionFilterTitles: Record<SubscriptionFilter, string> = {
+		all: 'All',
+		active: 'Active',
+		'possibly-active': 'Possibly Active',
+		ended: 'Ended',
+		unknown: 'Unknown',
+		confirmed: 'Confirmed',
+		suspected: 'Suspected',
+		'missing-amount': 'Missing Amount',
+		'missing-cadence': 'Missing Cadence'
+	};
+	const subscriptionFilterOrder: readonly SubscriptionFilter[] = [
+		'all',
+		'active',
+		'possibly-active',
+		'ended',
+		'unknown',
+		'confirmed',
+		'suspected',
+		'missing-amount',
+		'missing-cadence'
+	];
 	const appVersion = '0.1.0';
 
 	let services: FirebaseServices | undefined = $state();
@@ -77,11 +108,59 @@
 	let stopEvents: (() => void) | undefined;
 
 	const activeEntries = $derived(entries.filter((entry) => entry.status === 'active'));
+	const archivedEntries = $derived(entries.filter((entry) => entry.status === 'archived'));
+	const trashedEntries = $derived(entries.filter((entry) => entry.status === 'trashed'));
+	const allLifeEvents = $derived(projectLifeEvents(activeEntries));
 	const lifeEvents = $derived(
 		projectLifeEvents(boundedClientSearch.search(activeEntries, searchQuery))
 	);
 	const financialBaseline = $derived(buildFinancialBaseline(entries));
 	const subscriptions = $derived(projectSubscriptions(activeEntries));
+	const unverifiedEntries = $derived(projectUnverified(entries));
+	const hasFinancialBaseline = $derived(
+		Boolean(
+			financialBaseline.salary ||
+			financialBaseline.payFrequency ||
+			financialBaseline.rent ||
+			financialBaseline.confirmedRecurring.length > 0 ||
+			financialBaseline.possibleRecurring.length > 0 ||
+			financialBaseline.missingValueEntryIds.length > 0
+		)
+	);
+	const availableViews = $derived(
+		viewOrder.filter((candidate) => {
+			if (candidate === 'inbox') return activeEntries.length > 0;
+			if (candidate === 'events') {
+				return allLifeEvents.placed.length + allLifeEvents.unplaced.length > 0;
+			}
+			if (candidate === 'finances') return hasFinancialBaseline;
+			if (candidate === 'subscriptions') return subscriptions.length > 0;
+			if (candidate === 'verification') return unverifiedEntries.length > 0;
+			if (candidate === 'archive') return archivedEntries.length > 0;
+			return trashedEntries.length > 0;
+		})
+	);
+	const availableSubscriptionFilters = $derived(
+		subscriptionFilterOrder.filter((candidate) => {
+			if (subscriptions.length === 0) return false;
+			if (candidate === 'all') return true;
+			if (
+				candidate === 'active' ||
+				candidate === 'possibly-active' ||
+				candidate === 'ended' ||
+				candidate === 'unknown'
+			) {
+				return subscriptions.some((entry) => entry.recurrence?.activeState === candidate);
+			}
+			if (candidate === 'confirmed' || candidate === 'suspected') {
+				return subscriptions.some((entry) => entry.recurrence?.verificationStatus === candidate);
+			}
+			if (candidate === 'missing-amount') {
+				return subscriptions.some((entry) => entry.money === null);
+			}
+			return subscriptions.some((entry) => entry.recurrence?.cadence === 'unknown');
+		})
+	);
 	const filteredSubscriptions = $derived(
 		subscriptions.filter((entry) => {
 			const recurrence = entry.recurrence;
@@ -104,17 +183,33 @@
 			return recurrence.cadence === 'unknown';
 		})
 	);
-	const unverifiedEntries = $derived(projectUnverified(entries));
 	const listEntries = $derived.by((): readonly Entry[] => {
 		if (view === 'inbox') return activeEntries;
 		if (view === 'subscriptions') return filteredSubscriptions;
 		if (view === 'verification') return unverifiedEntries;
-		if (view === 'archive') return entries.filter((entry) => entry.status === 'archived');
-		if (view === 'trash') return entries.filter((entry) => entry.status === 'trashed');
+		if (view === 'archive') return archivedEntries;
+		if (view === 'trash') return trashedEntries;
 		return [];
 	});
 	const visibleEntries = $derived(boundedClientSearch.search(listEntries, searchQuery));
 	const aiEnabled = $derived(aiDevToolsEnabled());
+
+	$effect(() => {
+		if (availableViews.length === 0) {
+			if (view !== 'inbox') setView('inbox');
+			return;
+		}
+		if (!availableViews.includes(view)) setView(availableViews[0]);
+	});
+
+	$effect(() => {
+		if (
+			availableSubscriptionFilters.length === 0 ||
+			!availableSubscriptionFilters.includes(subscriptionFilter)
+		) {
+			subscriptionFilter = 'all';
+		}
+	});
 
 	function report(error: unknown): void {
 		void error;
@@ -342,33 +437,19 @@
 {:else if user}
 	<div class="app-shell">
 		<aside class="sidebar">
-			<nav aria-label="Views">
-				<button class:active={view === 'inbox'} type="button" onclick={() => setView('inbox')}>
-					Inbox
-				</button>
-				<button class:active={view === 'events'} type="button" onclick={() => setView('events')}>
-					Life events
-				</button>
-				<button class:active={view === 'finances'} type="button" onclick={() => setView('finances')}
-					>Financial baseline</button
-				>
-				<button
-					class:active={view === 'subscriptions'}
-					type="button"
-					onclick={() => setView('subscriptions')}>Subscriptions</button
-				>
-				<button
-					class:active={view === 'verification'}
-					type="button"
-					onclick={() => setView('verification')}>Needs verification</button
-				>
-				<button class:active={view === 'archive'} type="button" onclick={() => setView('archive')}
-					>Archive</button
-				>
-				<button class:active={view === 'trash'} type="button" onclick={() => setView('trash')}>
-					Trash
-				</button>
-			</nav>
+			{#if availableViews.length > 0}
+				<nav aria-label="Views">
+					{#each availableViews as availableView (availableView)}
+						<button
+							class:active={view === availableView}
+							type="button"
+							onclick={() => setView(availableView)}
+						>
+							{viewTitles[availableView]}
+						</button>
+					{/each}
+				</nav>
+			{/if}
 
 			<div class="sidebar-spacer"></div>
 
@@ -398,18 +479,16 @@
 
 		<main class="main-content">
 			<header class="mobile-header">
-				<label class="mobile-view">
-					<span class="sr-only">View</span>
-					<select bind:value={view} onchange={() => (searchQuery = '')}>
-						<option value="inbox">Inbox</option>
-						<option value="events">Life events</option>
-						<option value="finances">Financial baseline</option>
-						<option value="subscriptions">Subscriptions</option>
-						<option value="verification">Needs verification</option>
-						<option value="archive">Archive</option>
-						<option value="trash">Trash</option>
-					</select>
-				</label>
+				{#if availableViews.length > 0}
+					<label class="mobile-view">
+						<span class="sr-only">View</span>
+						<select bind:value={view} onchange={() => (searchQuery = '')}>
+							{#each availableViews as availableView (availableView)}
+								<option value={availableView}>{viewTitles[availableView]}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
 				<div class="mobile-actions">
 					<button type="button" onclick={exportCorpus} disabled={exporting}>Export</button>
 					<button class="icon-button" type="button" aria-label="Sign out" onclick={handleSignOut}>
@@ -437,19 +516,15 @@
 								</button>
 							{/if}
 						</label>
-						{#if view === 'subscriptions'}
+						{#if view === 'subscriptions' && availableSubscriptionFilters.length > 0}
 							<label class="filter-field">
 								<span class="sr-only">Filter</span>
 								<select bind:value={subscriptionFilter}>
-									<option value="all">All</option>
-									<option value="active">Active</option>
-									<option value="possibly-active">Possibly active</option>
-									<option value="ended">Ended</option>
-									<option value="unknown">Unknown</option>
-									<option value="confirmed">Confirmed</option>
-									<option value="suspected">Suspected</option>
-									<option value="missing-amount">Missing amount</option>
-									<option value="missing-cadence">Missing cadence</option>
+									{#each availableSubscriptionFilters as availableFilter (availableFilter)}
+										<option value={availableFilter}
+											>{subscriptionFilterTitles[availableFilter]}</option
+										>
+									{/each}
 								</select>
 							</label>
 						{/if}

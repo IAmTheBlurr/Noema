@@ -53,7 +53,7 @@
 		disabled={!baseline.payFrequency}
 		onclick={() => baseline.payFrequency && onOpen(baseline.payFrequency)}
 	>
-		<span>Pay frequency</span>
+		<span>Pay Frequency</span>
 		<strong>{recordValue(baseline.payFrequency)}</strong>
 	</button>
 	<button
@@ -67,33 +67,33 @@
 		<strong>{recordValue(baseline.rent)}</strong>
 	</button>
 	<div class="baseline-value">
-		<span>Confirmed outflow</span>
+		<span>Confirmed Outflow</span>
 		<strong>{totalsValue(baseline.confirmedMonthlyTotals)}</strong>
 		<small>Estimate</small>
 	</div>
 	<div class="baseline-value">
-		<span>Possible outflow</span>
+		<span>Possible Outflow</span>
 		<strong>{totalsValue(baseline.possibleMonthlyTotals)}</strong>
 		<small>Estimate</small>
 	</div>
 	<div class="baseline-value">
-		<span>Confirmed recurring</span>
+		<span>Confirmed Recurring</span>
 		<strong>{baseline.confirmedRecurring.length}</strong>
 	</div>
 	<div class="baseline-value">
-		<span>Possible recurring</span>
+		<span>Possible Recurring</span>
 		<strong>{baseline.possibleRecurring.length}</strong>
 	</div>
 	<div class="baseline-value">
-		<span>Confirmed subscriptions</span>
+		<span>Confirmed Subscriptions</span>
 		<strong>{baseline.confirmedSubscriptions.length}</strong>
 	</div>
 	<div class="baseline-value">
-		<span>Suspected subscriptions</span>
+		<span>Suspected Subscriptions</span>
 		<strong>{baseline.unverifiedSubscriptions.length}</strong>
 	</div>
 	<div class="baseline-value">
-		<span>Missing values</span>
+		<span>Missing Values</span>
 		<strong>{baseline.missingValueEntryIds.length}</strong>
 	</div>
 	<div class="baseline-value">

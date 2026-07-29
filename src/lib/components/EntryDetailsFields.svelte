@@ -121,7 +121,7 @@
 				<select bind:value={draft.standingSubjectHint}>
 					<option value="">Unknown</option>
 					<option value="salary">Salary</option>
-					<option value="pay-frequency">Pay frequency</option>
+					<option value="pay-frequency">Pay Frequency</option>
 					<option value="rent">Rent</option>
 					<option value="employment">Employment</option>
 					<option value="bank">Bank</option>
@@ -142,7 +142,7 @@
 				{/if}
 			</label>
 			<label class="field">
-				<span>Standing start</span>
+				<span>Standing Start</span>
 				<input
 					type="date"
 					bind:value={draft.standingEffectiveFrom}
@@ -153,7 +153,7 @@
 				{/if}
 			</label>
 			<label class="field">
-				<span>Standing end</span>
+				<span>Standing End</span>
 				<input
 					type="date"
 					bind:value={draft.standingEffectiveUntil}
@@ -204,7 +204,7 @@
 					<option value="utility">Utility</option>
 					<option value="insurance">Insurance</option>
 					<option value="membership">Membership</option>
-					<option value="debt-payment">Debt payment</option>
+					<option value="debt-payment">Debt Payment</option>
 					<option value="income">Income</option>
 					<option value="transfer">Transfer</option>
 					<option value="other">Other</option>
@@ -244,7 +244,7 @@
 				{/if}
 			</label>
 			<label class="field">
-				<span>Recurring start</span>
+				<span>Recurring Start</span>
 				<input
 					type="date"
 					bind:value={draft.recurrenceEffectiveFrom}
@@ -255,7 +255,7 @@
 				{/if}
 			</label>
 			<label class="field">
-				<span>Recurring end</span>
+				<span>Recurring End</span>
 				<input
 					type="date"
 					bind:value={draft.recurrenceEffectiveUntil}
@@ -277,20 +277,20 @@
 				</select>
 			</label>
 			<label class="field">
-				<span>Active state</span>
+				<span>Active State</span>
 				<select bind:value={draft.recurrenceActiveState}>
 					<option value="active">Active</option>
-					<option value="possibly-active">Possibly active</option>
+					<option value="possibly-active">Possibly Active</option>
 					<option value="ended">Ended</option>
 					<option value="unknown">Unknown</option>
 				</select>
 			</label>
 			<label class="check-field">
 				<input type="checkbox" bind:checked={draft.autoRenew} />
-				<span>Auto renew</span>
+				<span>Auto Renew</span>
 			</label>
 			<label class="field">
-				<span>Payment source</span>
+				<span>Payment Source</span>
 				<input
 					bind:value={draft.paymentSourceText}
 					aria-invalid={Boolean(errors.paymentSourceText)}
@@ -311,7 +311,7 @@
 				{/if}
 			</label>
 			<label class="field">
-				<span>Last charge</span>
+				<span>Last Charge</span>
 				<input
 					type="date"
 					bind:value={draft.lastKnownCharge}

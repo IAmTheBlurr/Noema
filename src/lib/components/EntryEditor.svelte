@@ -137,7 +137,7 @@
 
 		<div class="editor-scroll">
 			<form class="editor-form" onsubmit={submit} novalidate>
-				<div class="intent-selector" role="radiogroup" aria-label="Capture intent">
+				<div class="intent-selector" role="radiogroup" aria-label="Capture Intent">
 					<button
 						type="button"
 						role="radio"
@@ -150,14 +150,14 @@
 						role="radio"
 						aria-checked={draft.captureIntent === 'life-event'}
 						class:active={draft.captureIntent === 'life-event'}
-						onclick={() => setIntent('life-event')}>Life event</button
+						onclick={() => setIntent('life-event')}>Life Event</button
 					>
 					<button
 						type="button"
 						role="radio"
 						aria-checked={draft.captureIntent === 'standing-record'}
 						class:active={draft.captureIntent === 'standing-record'}
-						onclick={() => setIntent('standing-record')}>Standing record</button
+						onclick={() => setIntent('standing-record')}>Standing Record</button
 					>
 					<button
 						type="button"

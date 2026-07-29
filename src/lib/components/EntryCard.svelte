@@ -33,8 +33,8 @@
 
 	const intentLabels: Record<CaptureIntent, string> = {
 		thought: 'Thought',
-		'life-event': 'Event',
-		'standing-record': 'Standing',
+		'life-event': 'Life Event',
+		'standing-record': 'Standing Record',
 		'recurring-commitment': 'Recurring'
 	};
 

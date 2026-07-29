@@ -20,9 +20,9 @@
 	let submitError = $state('');
 	const headings: Record<CaptureIntent, string> = {
 		thought: 'Thought',
-		'life-event': 'Event',
-		'standing-record': 'Record',
-		'recurring-commitment': 'Commitment'
+		'life-event': 'Life Event',
+		'standing-record': 'Standing Record',
+		'recurring-commitment': 'Recurring'
 	};
 
 	onMount(() => document.querySelector<HTMLTextAreaElement>('#capture-text')?.focus());
@@ -75,7 +75,7 @@
 
 	<form onsubmit={submit} novalidate>
 		<fieldset class="capture-form-fields" disabled={submitting || disabled}>
-			<div class="intent-selector" role="radiogroup" aria-label="Capture intent">
+			<div class="intent-selector" role="radiogroup" aria-label="Capture Intent">
 				<button
 					type="button"
 					role="radio"
@@ -88,14 +88,14 @@
 					role="radio"
 					aria-checked={draft.captureIntent === 'life-event'}
 					class:active={draft.captureIntent === 'life-event'}
-					onclick={() => setIntent('life-event')}>Life event</button
+					onclick={() => setIntent('life-event')}>Life Event</button
 				>
 				<button
 					type="button"
 					role="radio"
 					aria-checked={draft.captureIntent === 'standing-record'}
 					class:active={draft.captureIntent === 'standing-record'}
-					onclick={() => setIntent('standing-record')}>Standing record</button
+					onclick={() => setIntent('standing-record')}>Standing Record</button
 				>
 				<button
 					type="button"

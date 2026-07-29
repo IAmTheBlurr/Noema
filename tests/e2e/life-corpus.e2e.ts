@@ -11,6 +11,7 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 	await expect(page.locator('section.signin-card')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Enter' }).click();
 	await expect(page.getByRole('heading', { name: 'Thought' })).toBeVisible();
+	await expect(page.locator('aside nav')).toHaveCount(0);
 	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
 	await expect(page.getByText('Empty', { exact: true })).toBeVisible();
 	await page.getByRole('button', { name: 'Check' }).click();
@@ -28,6 +29,7 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 	const entryCard = page.locator('.entry-card').filter({ hasText: thought });
 	await expect(entryCard).toBeVisible();
 	await expect(entryCard).toContainText('$240.00');
+	await expect(page.locator('aside nav').getByRole('button')).toHaveText(['Inbox']);
 
 	await page.getByLabel('Search').fill('Dakota autumn');
 	await expect(entryCard).toBeVisible();
@@ -79,8 +81,8 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 test('captures placed and unplaced life events', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Enter' }).click();
-	await page.getByRole('radio', { name: 'Life event' }).click();
-	await expect(page.getByRole('heading', { name: 'Event' })).toBeVisible();
+	await page.getByRole('radio', { name: 'Life Event' }).click();
+	await expect(page.getByRole('heading', { name: 'Life Event' })).toBeVisible();
 
 	await page.getByLabel('Entry', { exact: true }).fill('Moved out of the camper');
 	await page.getByRole('button', { name: 'Add' }).click();
@@ -88,7 +90,7 @@ test('captures placed and unplaced life events', async ({ page }) => {
 		page.locator('.entry-card').filter({ hasText: 'Moved out of the camper' })
 	).toBeVisible();
 
-	await page.getByRole('radio', { name: 'Life event' }).click();
+	await page.getByRole('radio', { name: 'Life Event' }).click();
 	await page.getByLabel('Entry', { exact: true }).fill('Started the Rapid City lease');
 	await page.getByRole('button', { name: 'Details' }).click();
 	await page.getByLabel('When').fill('Sometime during winter 2023');
@@ -100,9 +102,14 @@ test('captures placed and unplaced life events', async ({ page }) => {
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'Started the Rapid City lease' })
 	).toBeVisible();
+	await expect(page.locator('aside nav').getByRole('button')).toHaveText([
+		'Inbox',
+		'Life Events',
+		'Needs Verification'
+	]);
 
-	await page.locator('aside nav').getByRole('button', { name: 'Life events' }).click();
-	await expect(page.getByRole('heading', { name: 'Events' })).toBeVisible();
+	await page.locator('aside nav').getByRole('button', { name: 'Life Events' }).click();
+	await expect(page.getByRole('heading', { name: 'Life Events' })).toBeVisible();
 	await expect(page.getByText('Unplaced', { exact: true })).toBeVisible();
 	await expect(page.getByText('Moved out of the camper', { exact: true })).toBeVisible();
 	await expect(page.getByText('Sometime during winter 2023', { exact: true })).toBeVisible();
@@ -115,7 +122,7 @@ test('derives financial, subscription, and verification views from shared entrie
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Enter' }).click();
 
-	await page.getByRole('radio', { name: 'Standing record' }).click();
+	await page.getByRole('radio', { name: 'Standing Record' }).click();
 	await page.getByLabel('Entry', { exact: true }).fill('Current annual salary');
 	await page.getByRole('button', { name: 'Details' }).click();
 	await page.getByLabel('Amount').fill('120000');
@@ -149,7 +156,7 @@ test('derives financial, subscription, and verification views from shared entrie
 	await rentRecurring.getByLabel('Kind').selectOption('rent');
 	await rentRecurring.getByLabel('Cadence').selectOption('monthly');
 	await rentRecurring.getByLabel('Verification').selectOption('confirmed');
-	await rentRecurring.getByLabel('Active state').selectOption('active');
+	await rentRecurring.getByLabel('Active State').selectOption('active');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.locator('.entry-card').filter({ hasText: 'Current rent' })).toBeVisible();
 
@@ -159,7 +166,7 @@ test('derives financial, subscription, and verification views from shared entrie
 	const suspected = page.getByRole('group', { name: 'Recurring' });
 	await suspected.getByLabel('Kind').selectOption('subscription');
 	await suspected.getByLabel('Verification').selectOption('suspected');
-	await suspected.getByLabel('Active state').selectOption('possibly-active');
+	await suspected.getByLabel('Active State').selectOption('possibly-active');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
@@ -172,9 +179,15 @@ test('derives financial, subscription, and verification views from shared entrie
 	await confirmed.getByLabel('Kind').selectOption('subscription');
 	await confirmed.getByLabel('Cadence').selectOption('monthly');
 	await confirmed.getByLabel('Verification').selectOption('confirmed');
-	await confirmed.getByLabel('Active state').selectOption('active');
+	await confirmed.getByLabel('Active State').selectOption('active');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.locator('.entry-card').filter({ hasText: 'Cloud storage' })).toBeVisible();
+	await expect(page.locator('aside nav').getByRole('button')).toHaveText([
+		'Inbox',
+		'Financial Baseline',
+		'Subscriptions',
+		'Needs Verification'
+	]);
 
 	const rentCard = page.locator('.entry-card').filter({ hasText: 'Current rent' });
 	await rentCard.locator('.card-main').click();
@@ -188,8 +201,8 @@ test('derives financial, subscription, and verification views from shared entrie
 	await editor.getByLabel('Notes').fill('Lease record');
 	await editor.getByRole('button', { name: 'Save' }).click();
 
-	await page.locator('aside nav').getByRole('button', { name: 'Financial baseline' }).click();
-	await expect(page.getByRole('heading', { name: 'Finances' })).toBeVisible();
+	await page.locator('aside nav').getByRole('button', { name: 'Financial Baseline' }).click();
+	await expect(page.getByRole('heading', { name: 'Financial Baseline' })).toBeVisible();
 	await expect(page.getByText('$120,000.00', { exact: true })).toBeVisible();
 	await expect(page.getByText('$1,520.00', { exact: true })).toBeVisible();
 	await expect(page.getByText('Biweekly', { exact: true })).toBeVisible();
@@ -199,19 +212,29 @@ test('derives financial, subscription, and verification views from shared entrie
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
 	).toBeVisible();
-	await page.getByLabel('Filter').selectOption('missing-amount');
+	const filter = page.getByLabel('Filter');
+	await expect(filter.locator('option')).toHaveText([
+		'All',
+		'Active',
+		'Possibly Active',
+		'Confirmed',
+		'Suspected',
+		'Missing Amount',
+		'Missing Cadence'
+	]);
+	await filter.selectOption('missing-amount');
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
 	).toBeVisible();
 	await expect(page.locator('.entry-card').filter({ hasText: 'Cloud storage' })).not.toBeVisible();
 
-	await page.locator('aside nav').getByRole('button', { name: 'Needs verification' }).click();
+	await page.locator('aside nav').getByRole('button', { name: 'Needs Verification' }).click();
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
-	).toContainText('Missing amount');
+	).toContainText('Missing Amount');
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
-	).toContainText('Missing cadence');
+	).toContainText('Missing Cadence');
 });
 
 test('downloads a portable corpus ZIP', async ({ page }) => {
@@ -235,12 +258,19 @@ test('keeps capture and navigation usable on a phone viewport', async ({ page })
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Enter' }).click();
 
-	await expect(page.getByRole('combobox', { name: 'View' })).toBeVisible();
+	await expect(page.getByRole('combobox', { name: 'View' })).toHaveCount(0);
 	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
 	await page.getByRole('radio', { name: 'Recurring' }).click();
 	await page.getByLabel('Entry', { exact: true }).fill('Phone capture');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.locator('.entry-card').filter({ hasText: 'Phone capture' })).toBeVisible();
+	const view = page.getByRole('combobox', { name: 'View' });
+	await expect(view).toBeVisible();
+	await expect(view.locator('option')).toHaveText([
+		'Inbox',
+		'Financial Baseline',
+		'Needs Verification'
+	]);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
 		true
 	);
