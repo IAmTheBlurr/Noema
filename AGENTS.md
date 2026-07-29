@@ -2,132 +2,73 @@
 
 Instructions for coding agents working in this repository.
 
-## Project overview
+## Context
 
-A private, single-user web app. It has one user: its author. It will never be
-released, marketed, demoed, or onboarded to anyone else.
+This is a private, single-user application whose author is its primary audience.
+Optimize for the author's current needs. Do not add marketing or onboarding by
+default, but treat the audience as context rather than a permanent constraint.
 
-<!-- Add setup, build, and test commands here. -->
+## Duty of care
 
-## Audience assumption
+- Understand the request and inspect the current state before changing it.
+- Preserve user intent, data, functionality, and unrelated work.
+- Prefer scoped, comprehensible, and reversible changes.
+- Surface consequential assumptions, risks, and uncertainty.
+- Verify work in proportion to its impact and report results honestly.
 
-The only reader is the author. He knows what the app does, chose to build it,
-and already trusts it. He does not need to be sold, taught, welcomed,
-reassured, or encouraged.
+## Product and interface
 
-Never write for a prospective user, a first-time visitor, or an evaluator.
-There are none and there will never be any.
+- Preserve capabilities and relevant system state when changing content or
+  presentation.
+- Use clear, conventional, and precise language.
+- Give controls accessible names and make important states perceptible,
+  including selection, progress, loading, focus, and failure.
+- Make errors identify the failure and a useful recovery action when one
+  exists.
+- Remove content or ornament only when it contributes no useful information,
+  orientation, or interaction.
+- Keep components focused. Follow the established visual language unless the
+  task calls for a design change.
+- Keep copy changes, behavior changes, and visual redesigns within the requested
+  scope.
 
-## UI content style
+## Engineering
 
-The governing constraint:
+- Prefer the smallest coherent solution that fits the existing architecture and
+  conventions.
+- Favor readable, maintainable, and type-safe code with clear boundaries.
+- Validate untrusted input and handle expected failure paths.
+- Add or upgrade dependencies only when the benefit justifies the cost and
+  compatibility risk.
 
-**Every string in the interface must be a label, a value, or an error.**
+## Data, security, and privacy
 
-| Kind | Definition |
-| --- | --- |
-| Label | Names a control or region. 1-3 words. No sentence. |
-| Value | User data or system state. |
-| Error | What failed and what to do. Only on failure. |
+- Use least privilege and keep secrets out of source, logs, and client-visible
+  output.
+- Avoid logging private content when operational metadata is sufficient.
+- Treat destructive operations and schema changes carefully. Preserve
+  compatibility or provide a migration and recovery path.
 
-If a string is none of these, delete it. Do not rewrite it shorter. Delete it.
+## Verification and delivery
 
-### Never remove
+- Test changed behavior and likely regressions. Broaden verification as risk
+  increases.
+- Inspect the final diff and repository status before committing or delivering.
+- Update documentation when a change would otherwise make it inaccurate.
+- Before deployment, confirm the target, configuration, build, and required
+  checks. Report any unverified area or external blocker.
 
-These rules delete words and ornament. They never delete capability or
-information. The following always survive:
+## Version control
 
-- **Controls and features.** Inputs, buttons, search, filters, sort, navigation.
-  This is a copy pass, not a scope pass. Never delete a control to satisfy a
-  rule about text.
-- **State and values.** Counts, totals, statuses, timestamps, selection,
-  progress, results. The author knows what the app does. He does not know what
-  it currently contains, and only the screen can tell him.
-- **View identity.** Every screen names the view it is showing, in one word.
-  A highlighted nav item alone is not sufficient.
-- **Input identification.** Every input carries one word identifying it, as a
-  label or a placeholder. One, not both. An unlabeled box is a puzzle.
-- **Affordance indicators.** Disclosure chevrons, dropdown carets, required
-  markers, loading states, focus states. These encode behavior no word
-  replaces. Only *redundant* icons are prohibited: the `+` beside `Add`, the
-  glyph beside a wordmark.
-- **Empty regions.** Render the word `Empty`, or render nothing at all. Never
-  render an empty container.
-
-### Prohibited
-
-Do not generate any of the following, in any form, under any justification:
-
-- Taglines, slogans, mission statements, value propositions, hero copy
-- Epigraphs, aphorisms, philosophy, poetry, any sentence with a "voice"
-- Eyebrows and kickers (small-caps labels above headings)
-- Section headings whose section is already obvious from position or content
-- Helper text, hint text, or captions explaining a control that works
-- Reassurance or trust copy about privacy, security, or data handling
-- Empty-state prose. An empty region says `Empty` or shows nothing
-- Onboarding, tips, tours, callouts, "get started" affordances
-- Placeholder text that gives examples of what to type
-- Confirmation prose beyond the state change itself
-- Wordmarks, logos, product names, brand glyphs
-- Decorative icons; icons paired with text that says the same thing
-- Questions where a label belongs ("What would you like to add?" -> "Add")
-- Invented verbs for standard actions. Use `Add`, `Save`, `Delete`, `Edit`
-- Second person. No "you," "your," "let's," "we"
-- Adjectives and adverbs anywhere in the chrome
-
-### Required
-
-- Standard vocabulary over bespoke vocabulary, always.
-- Shorten by deleting whole strings, never by truncating a needed one into a
-  fragment. `OK · mock` is not a shorter label, it is a broken one. Any label
-  that survives is a real word.
-- Sentence case when writing text. This governs the words, not the CSS.
-- One element, one job. Nothing does double duty.
-- A control whose function is unambiguous from shape and position may carry
-  no text at all.
-
-## Verification
-
-Before emitting any UI, run this on every string and every element, in order:
-
-1. Delete it. Can the user still complete the task? If yes, it stays deleted.
-2. Does it restate something true of the app in general, independent of this
-   screen and its current data? Delete it. Knowing what the app does is not
-   knowing what it currently contains, so never delete state on these grounds.
-3. More than three words? Justify each word or cut to three.
-4. Does it have a tone? Delete it. Interface text has no tone.
-
-Applies to elements too, but only to elements that carry information:
-decorative icons, badges, and any container whose sole contents were deleted
-by the rules above. A container holding surviving content stays, with its
-existing visual treatment intact.
-
-## Out of scope
-
-These rules govern content only: what exists on screen and what it says.
-
-The visual language is settled and is not the agent's to revise. Do not change,
-and do not propose changing:
-
-- Color palette, background treatment, accent colors
-- Typefaces, weights, type scale
-- Border radius, borders, shadows, gradients, blurs
-- Spacing, padding, margins, whitespace, layout density
-- Transitions, animation, hover and focus effects
-- Component shape and visual treatment
-
-When these rules remove text from a component, keep the component's styling
-exactly as it is and let it shrink. Do not restyle, recenter, rebalance, or
-"clean up" what remains. Removing content is not license to redesign.
-
-## Known failure mode
-
-The default output of a language model asked for a "clean" or "minimal" UI is a
-marketing landing page with generous whitespace and a serif headline. That is a
-style, not restraint, and it is the exact failure being prohibited here.
-Restraint is measured by count of elements, not by amount of space between them.
+- Commit every agent-authored change before delivery.
+- Keep each commit atomic: one coherent concern, with independent changes split
+  into separate commits.
+- Use a concise, semantically useful subject line and a message body that
+  records intent, scope, and significant context.
+- Inspect the staged diff before committing. Do not include unrelated user
+  changes.
 
 ## When uncertain
 
-Emit less. Ask. Never fill a gap with copy. Report ambiguous cases in the final
-summary rather than resolving them by guessing.
+Investigate first. Ask when a material choice cannot be resolved safely from the
+repository and request. Do not invent requirements to fill a gap.
