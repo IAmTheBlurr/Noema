@@ -36,7 +36,7 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 	await page.getByLabel('Search').fill('earbuds');
 	await expect(entryCard).not.toBeVisible();
 	await expect(page.getByText('Empty', { exact: true })).toBeVisible();
-	await page.getByRole('button', { name: 'Clear' }).click();
+	await page.getByLabel('Search').fill('');
 
 	await entryCard.getByRole('button', { name: 'Repeat' }).click();
 
