@@ -5,7 +5,6 @@
 	import {
 		draftFromEntry,
 		emptyEntryDraft,
-		type CaptureIntent,
 		type Entry,
 		type EntryDraft,
 		type EntryEvent
@@ -73,12 +72,6 @@
 		record_reactivated: 'Reactivated'
 	};
 
-	function setIntent(intent: CaptureIntent): void {
-		draft.captureIntent = intent;
-		if (intent === 'standing-record') draft.enableStanding = true;
-		if (intent === 'recurring-commitment') draft.enableRecurrence = true;
-	}
-
 	async function submit(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
 		const result = validateEntryDraft(draft);
@@ -137,36 +130,6 @@
 
 		<div class="editor-scroll">
 			<form class="editor-form" onsubmit={submit} novalidate>
-				<div class="intent-selector" role="radiogroup" aria-label="Capture Intent">
-					<button
-						type="button"
-						role="radio"
-						aria-checked={draft.captureIntent === 'thought'}
-						class:active={draft.captureIntent === 'thought'}
-						onclick={() => setIntent('thought')}>Thought</button
-					>
-					<button
-						type="button"
-						role="radio"
-						aria-checked={draft.captureIntent === 'life-event'}
-						class:active={draft.captureIntent === 'life-event'}
-						onclick={() => setIntent('life-event')}>Life Event</button
-					>
-					<button
-						type="button"
-						role="radio"
-						aria-checked={draft.captureIntent === 'standing-record'}
-						class:active={draft.captureIntent === 'standing-record'}
-						onclick={() => setIntent('standing-record')}>Standing Record</button
-					>
-					<button
-						type="button"
-						role="radio"
-						aria-checked={draft.captureIntent === 'recurring-commitment'}
-						class:active={draft.captureIntent === 'recurring-commitment'}
-						onclick={() => setIntent('recurring-commitment')}>Recurring</button
-					>
-				</div>
 				<label class="field full">
 					<span>Entry</span>
 					<textarea rows="5" bind:value={draft.rawText} aria-invalid={Boolean(errors.rawText)}

@@ -1,5 +1,112 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFile } from 'node:fs/promises';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
+
+const PROJECT_ID = 'demo-life-corpus';
+let environment: RulesTestEnvironment;
+
+type SeedEntry = {
+	id: string;
+	data: Readonly<Record<string, unknown>>;
+};
+
+test.beforeAll(async () => {
+	environment = await initializeTestEnvironment({
+		projectId: PROJECT_ID,
+		firestore: {
+			host: '127.0.0.1',
+			port: 8080
+		}
+	});
+});
+
+test.afterAll(async () => {
+	await environment.cleanup();
+});
+
+async function storedOwnerId(page: Page): Promise<string | null> {
+	return page.evaluate(async () => {
+		for (const storage of [localStorage, sessionStorage]) {
+			for (let index = 0; index < storage.length; index += 1) {
+				const key = storage.key(index);
+				if (!key?.startsWith('firebase:authUser:')) continue;
+				const value = storage.getItem(key);
+				if (!value) continue;
+				const parsed = JSON.parse(value) as { uid?: unknown };
+				if (typeof parsed.uid === 'string') return parsed.uid;
+			}
+		}
+
+		return new Promise<string | null>((resolve) => {
+			const open = indexedDB.open('firebaseLocalStorageDb');
+			open.onerror = () => resolve(null);
+			open.onsuccess = () => {
+				const database = open.result;
+				if (!database.objectStoreNames.contains('firebaseLocalStorage')) {
+					database.close();
+					resolve(null);
+					return;
+				}
+				const transaction = database.transaction('firebaseLocalStorage', 'readonly');
+				const request = transaction.objectStore('firebaseLocalStorage').getAll();
+				request.onerror = () => {
+					database.close();
+					resolve(null);
+				};
+				request.onsuccess = () => {
+					const uid = request.result
+						.map((record: { value?: { uid?: unknown } }) => record.value?.uid)
+						.find((value: unknown): value is string => typeof value === 'string');
+					database.close();
+					resolve(uid ?? null);
+				};
+			};
+		});
+	});
+}
+
+async function currentOwnerId(page: Page): Promise<string> {
+	await expect.poll(() => storedOwnerId(page)).not.toBeNull();
+	const ownerId = await storedOwnerId(page);
+	if (!ownerId) throw new Error('Auth fixture missing.');
+	return ownerId;
+}
+
+function entryDocument(
+	ownerId: string,
+	rawText: string,
+	fields: Readonly<Record<string, unknown>> = {}
+): Readonly<Record<string, unknown>> {
+	const now = Timestamp.now();
+	return {
+		ownerId,
+		rawText,
+		captureIntent: 'thought',
+		url: null,
+		money: null,
+		notes: null,
+		timeHorizon: null,
+		status: 'active',
+		recurrenceCount: 0,
+		createdAt: now,
+		updatedAt: now,
+		archivedAt: null,
+		trashedAt: null,
+		schemaVersion: 2,
+		...fields
+	};
+}
+
+async function seedEntries(ownerId: string, entries: readonly SeedEntry[]): Promise<void> {
+	await environment.withSecurityRulesDisabled(async (context) => {
+		await Promise.all(
+			entries.map((entry) =>
+				setDoc(doc(context.firestore(), `users/${ownerId}/entries/${entry.id}`), entry.data)
+			)
+		);
+	});
+}
 
 test('captures, retrieves, revises, resurfaces, archives, restores, and deletes an entry', async ({
 	page
@@ -10,9 +117,10 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 	).toBeVisible();
 	await expect(page.locator('section.signin-card')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Enter' }).click();
-	await expect(page.getByRole('heading', { name: 'Thought' })).toBeVisible();
 	await expect(page.locator('aside nav')).toHaveCount(0);
+	await expect(page.getByRole('radio')).toHaveCount(0);
 	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Details' })).toBeVisible();
 	await expect(page.getByText('Empty', { exact: true })).toBeVisible();
 	await page.getByRole('button', { name: 'Check' }).click();
 	await expect(page.getByText('OK · mock')).toBeVisible();
@@ -78,27 +186,33 @@ test('captures, retrieves, revises, resurfaces, archives, restores, and deletes 
 	await expect(trashedCard).not.toBeVisible();
 });
 
-test('captures placed and unplaced life events', async ({ page }) => {
+test('renders placed and unplaced life events from stored records', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Enter' }).click();
-	await page.getByRole('radio', { name: 'Life Event' }).click();
-	await expect(page.getByRole('heading', { name: 'Life Event' })).toBeVisible();
-
-	await page.getByLabel('Entry', { exact: true }).fill('Moved out of the camper');
-	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(
-		page.locator('.entry-card').filter({ hasText: 'Moved out of the camper' })
-	).toBeVisible();
-
-	await page.getByRole('radio', { name: 'Life Event' }).click();
-	await page.getByLabel('Entry', { exact: true }).fill('Started the Rapid City lease');
-	await page.getByRole('button', { name: 'Details' }).click();
-	await page.getByLabel('When').fill('Sometime during winter 2023');
-	await page.getByLabel('Earliest').fill('2023-12-01');
-	await page.getByLabel('Latest').fill('2024-02-29');
-	await page.getByLabel('Precision').selectOption('season');
-	await page.getByLabel('Reviewed').check();
-	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
+	const ownerId = await currentOwnerId(page);
+	await seedEntries(ownerId, [
+		{
+			id: 'unplaced-event',
+			data: entryDocument(ownerId, 'Moved out of the camper', {
+				captureIntent: 'life-event'
+			})
+		},
+		{
+			id: 'placed-event',
+			data: entryDocument(ownerId, 'Started the Rapid City lease', {
+				captureIntent: 'life-event',
+				temporal: {
+					rawText: 'Sometime during winter 2023',
+					earliest: '2023-12-01',
+					latest: '2024-02-29',
+					precision: 'season',
+					source: 'human',
+					reviewedByUser: true
+				}
+			})
+		}
+	]);
 	await expect(
 		page.locator('.entry-card').filter({ hasText: 'Started the Rapid City lease' })
 	).toBeVisible();
@@ -121,66 +235,77 @@ test('derives financial, subscription, and verification views from shared entrie
 }) => {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Enter' }).click();
-
-	await page.getByRole('radio', { name: 'Standing Record' }).click();
-	await page.getByLabel('Entry', { exact: true }).fill('Current annual salary');
-	await page.getByRole('button', { name: 'Details' }).click();
-	await page.getByLabel('Amount').fill('120000');
-	const salaryGroup = page.getByRole('group', { name: 'Standing' });
-	await salaryGroup.getByLabel('Subject').selectOption('salary');
-	await salaryGroup.getByLabel('Verification').selectOption('confirmed');
-	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(
-		page.locator('.entry-card').filter({ hasText: 'Current annual salary' })
-	).toBeVisible();
-
-	await page.getByLabel('Entry', { exact: true }).fill('Current pay frequency');
-	await page.getByRole('button', { name: 'Details' }).click();
-	const payGroup = page.getByRole('group', { name: 'Standing' });
-	await payGroup.getByLabel('Subject').selectOption('pay-frequency');
-	await payGroup.getByLabel('Value').fill('Biweekly');
-	await payGroup.getByLabel('Verification').selectOption('confirmed');
-	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(
-		page.locator('.entry-card').filter({ hasText: 'Current pay frequency' })
-	).toBeVisible();
-
-	await page.getByLabel('Entry', { exact: true }).fill('Current rent');
-	await page.getByRole('button', { name: 'Details' }).click();
-	await page.getByLabel('Amount').fill('1500');
-	const rentStanding = page.getByRole('group', { name: 'Standing' });
-	await rentStanding.getByLabel('Subject').selectOption('rent');
-	await rentStanding.getByLabel('Verification').selectOption('confirmed');
-	await page.getByLabel('Recurring', { exact: true }).check();
-	const rentRecurring = page.getByRole('group', { name: 'Recurring' });
-	await rentRecurring.getByLabel('Kind').selectOption('rent');
-	await rentRecurring.getByLabel('Cadence').selectOption('monthly');
-	await rentRecurring.getByLabel('Verification').selectOption('confirmed');
-	await rentRecurring.getByLabel('Active State').selectOption('active');
-	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(page.locator('.entry-card').filter({ hasText: 'Current rent' })).toBeVisible();
-
-	await page.getByRole('radio', { name: 'Recurring' }).click();
-	await page.getByLabel('Entry', { exact: true }).fill('I may still be paying for Adobe');
-	await page.getByRole('button', { name: 'Details' }).click();
-	const suspected = page.getByRole('group', { name: 'Recurring' });
-	await suspected.getByLabel('Kind').selectOption('subscription');
-	await suspected.getByLabel('Verification').selectOption('suspected');
-	await suspected.getByLabel('Active State').selectOption('possibly-active');
-	await page.getByRole('button', { name: 'Add' }).click();
-	await expect(
-		page.locator('.entry-card').filter({ hasText: 'I may still be paying for Adobe' })
-	).toBeVisible();
-
-	await page.getByLabel('Entry', { exact: true }).fill('Cloud storage');
-	await page.getByRole('button', { name: 'Details' }).click();
-	await page.getByLabel('Amount').fill('20');
-	const confirmed = page.getByRole('group', { name: 'Recurring' });
-	await confirmed.getByLabel('Kind').selectOption('subscription');
-	await confirmed.getByLabel('Cadence').selectOption('monthly');
-	await confirmed.getByLabel('Verification').selectOption('confirmed');
-	await confirmed.getByLabel('Active State').selectOption('active');
-	await page.getByRole('button', { name: 'Add' }).click();
+	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
+	const ownerId = await currentOwnerId(page);
+	await seedEntries(ownerId, [
+		{
+			id: 'salary',
+			data: entryDocument(ownerId, 'Current annual salary', {
+				captureIntent: 'standing-record',
+				money: { minorUnits: 12_000_000, currency: 'USD' },
+				standingRecord: {
+					subjectHint: 'salary',
+					verificationStatus: 'confirmed',
+					state: 'current'
+				}
+			})
+		},
+		{
+			id: 'pay-frequency',
+			data: entryDocument(ownerId, 'Current pay frequency', {
+				captureIntent: 'standing-record',
+				standingRecord: {
+					subjectHint: 'pay-frequency',
+					valueText: 'Biweekly',
+					verificationStatus: 'confirmed',
+					state: 'current'
+				}
+			})
+		},
+		{
+			id: 'rent',
+			data: entryDocument(ownerId, 'Current rent', {
+				captureIntent: 'standing-record',
+				money: { minorUnits: 150_000, currency: 'USD' },
+				standingRecord: {
+					subjectHint: 'rent',
+					verificationStatus: 'confirmed',
+					state: 'current'
+				},
+				recurrence: {
+					recurringKind: 'rent',
+					cadence: 'monthly',
+					verificationStatus: 'confirmed',
+					activeState: 'active'
+				}
+			})
+		},
+		{
+			id: 'adobe',
+			data: entryDocument(ownerId, 'I may still be paying for Adobe', {
+				captureIntent: 'recurring-commitment',
+				recurrence: {
+					recurringKind: 'subscription',
+					cadence: 'unknown',
+					verificationStatus: 'suspected',
+					activeState: 'possibly-active'
+				}
+			})
+		},
+		{
+			id: 'cloud',
+			data: entryDocument(ownerId, 'Cloud storage', {
+				captureIntent: 'recurring-commitment',
+				money: { minorUnits: 2_000, currency: 'USD' },
+				recurrence: {
+					recurringKind: 'subscription',
+					cadence: 'monthly',
+					verificationStatus: 'confirmed',
+					activeState: 'active'
+				}
+			})
+		}
+	]);
 	await expect(page.locator('.entry-card').filter({ hasText: 'Cloud storage' })).toBeVisible();
 	await expect(page.locator('aside nav').getByRole('button')).toHaveText([
 		'Inbox',
@@ -260,17 +385,12 @@ test('keeps capture and navigation usable on a phone viewport', async ({ page })
 
 	await expect(page.getByRole('combobox', { name: 'View' })).toHaveCount(0);
 	await expect(page.getByLabel('Entry', { exact: true })).toBeVisible();
-	await page.getByRole('radio', { name: 'Recurring' }).click();
+	await expect(page.getByRole('radio')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Details' })).toBeVisible();
 	await page.getByLabel('Entry', { exact: true }).fill('Phone capture');
 	await page.getByRole('button', { name: 'Add' }).click();
 	await expect(page.locator('.entry-card').filter({ hasText: 'Phone capture' })).toBeVisible();
-	const view = page.getByRole('combobox', { name: 'View' });
-	await expect(view).toBeVisible();
-	await expect(view.locator('option')).toHaveText([
-		'Inbox',
-		'Financial Baseline',
-		'Needs Verification'
-	]);
+	await expect(page.getByRole('combobox', { name: 'View' })).toHaveCount(0);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
 		true
 	);

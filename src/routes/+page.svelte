@@ -479,16 +479,6 @@
 
 		<main class="main-content">
 			<header class="mobile-header">
-				{#if availableViews.length > 0}
-					<label class="mobile-view">
-						<span class="sr-only">View</span>
-						<select bind:value={view} onchange={() => (searchQuery = '')}>
-							{#each availableViews as availableView (availableView)}
-								<option value={availableView}>{viewTitles[availableView]}</option>
-							{/each}
-						</select>
-					</label>
-				{/if}
 				<div class="mobile-actions">
 					<button type="button" onclick={exportCorpus} disabled={exporting}>Export</button>
 					<button class="icon-button" type="button" aria-label="Sign out" onclick={handleSignOut}>

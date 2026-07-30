@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 
 	import EntryDetailsFields from '$lib/components/EntryDetailsFields.svelte';
-	import { emptyEntryDraft, type CaptureIntent, type EntryDraft } from '$lib/domain/entry';
+	import { emptyEntryDraft, type EntryDraft } from '$lib/domain/entry';
 	import { validateEntryDraft, type ValidatedEntryInput } from '$lib/validation/entry';
 
 	let {
@@ -18,12 +18,6 @@
 	let submitting = $state(false);
 	let errors: Readonly<Record<string, string>> = $state({});
 	let submitError = $state('');
-	const headings: Record<CaptureIntent, string> = {
-		thought: 'Thought',
-		'life-event': 'Life Event',
-		'standing-record': 'Standing Record',
-		'recurring-commitment': 'Recurring'
-	};
 
 	onMount(() => document.querySelector<HTMLTextAreaElement>('#capture-text')?.focus());
 
@@ -38,7 +32,7 @@
 		submitError = '';
 		try {
 			await onCreate(result.value);
-			draft = emptyEntryDraft(draft.captureIntent);
+			draft = emptyEntryDraft();
 			detailsOpen = false;
 			errors = {};
 			requestAnimationFrame(() =>
@@ -51,13 +45,6 @@
 		}
 	}
 
-	function setIntent(intent: CaptureIntent): void {
-		draft.captureIntent = intent;
-		if (intent === 'standing-record') draft.enableStanding = true;
-		if (intent === 'recurring-commitment') draft.enableRecurrence = true;
-		errors = {};
-	}
-
 	function handleKeydown(event: KeyboardEvent): void {
 		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
 			event.preventDefault();
@@ -68,43 +55,9 @@
 	}
 </script>
 
-<section class="capture-shell" aria-labelledby="capture-heading">
-	<div class="capture-heading">
-		<h1 id="capture-heading">{headings[draft.captureIntent]}</h1>
-	</div>
-
+<section class="capture-shell">
 	<form onsubmit={submit} novalidate>
 		<fieldset class="capture-form-fields" disabled={submitting || disabled}>
-			<div class="intent-selector" role="radiogroup" aria-label="Capture Intent">
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.captureIntent === 'thought'}
-					class:active={draft.captureIntent === 'thought'}
-					onclick={() => setIntent('thought')}>Thought</button
-				>
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.captureIntent === 'life-event'}
-					class:active={draft.captureIntent === 'life-event'}
-					onclick={() => setIntent('life-event')}>Life Event</button
-				>
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.captureIntent === 'standing-record'}
-					class:active={draft.captureIntent === 'standing-record'}
-					onclick={() => setIntent('standing-record')}>Standing Record</button
-				>
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.captureIntent === 'recurring-commitment'}
-					class:active={draft.captureIntent === 'recurring-commitment'}
-					onclick={() => setIntent('recurring-commitment')}>Recurring</button
-				>
-			</div>
 			<label class="sr-only" for="capture-text">Entry</label>
 			<textarea
 				id="capture-text"
