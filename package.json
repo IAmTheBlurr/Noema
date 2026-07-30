@@ -10,7 +10,7 @@
 	},
 	"scripts": {
 		"dev": "concurrently --kill-others-on-fail --names emulators,web --prefix-colors magenta,cyan \"pnpm dev:emulators\" \"pnpm dev:web\"",
-		"dev:web": "vite dev --host 127.0.0.1",
+		"dev:web": "vite dev --host 0.0.0.0",
 		"dev:emulators": "pnpm functions:build && cross-env XDG_CONFIG_HOME=.firebase-config FIREBASE_CLI_DISABLE_TELEMETRY=1 firebase emulators:start --only auth,firestore,functions,hosting --project demo-life-corpus",
 		"build": "vite build",
 		"preview": "vite preview",
